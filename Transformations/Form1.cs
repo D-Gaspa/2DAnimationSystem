@@ -8,6 +8,11 @@ public partial class Form1 : Form
     private readonly Point _originalFillColorButtonLocation;
     private Color _borderColor;
     private Color _fillColor;
+    private bool _isAddFigureModeActive;
+    private bool _isAddCustomFigureModeActive;
+    private readonly List<PointF> _customFigurePoints = [];
+    private Bitmap? _tempBitmap;
+    
     public Form1()
     {
         // Initialize components and set up the drawing environment.
@@ -25,6 +30,11 @@ public partial class Form1 : Form
         _canvas.FigureRemoved += OnFigureRemoved;
         figuresCheckedListBox.ItemCheck += FiguresCheckedListBox_ItemCheck;
         pictureBox1.MouseMove += PictureBox1_MouseMove;
+        pictureBox1.MouseClick += PictureBox1_MouseClick;
+        addCustomFigureCheckBox.CheckedChanged += AddCustomFigureCheckBox_CheckedChanged;
+        addCustomFigureButton.Click += AddCustomFigureButton_Click;
+        resetCustomFigureButton.Click += ResetCustomFigureButton_Click;
+        cancelCustomFigureButton.Click += CancelCustomFigureButton_Click;
 
         // Update the button states.
         UpdateButtonStates();
@@ -37,6 +47,7 @@ public partial class Form1 : Form
     {
         // Set the default values for the figure properties.
         addFigureCheckBox_CheckedChanged(this, EventArgs.Empty);
+        AddCustomFigureCheckBox_CheckedChanged(this, EventArgs.Empty);
         customPivotCheckBox.Checked = false;
         sizeTextBox.Text = @"1";
         positionXTextBox.Text = @"100";
@@ -52,6 +63,39 @@ public partial class Form1 : Form
         // Select the first figure type by default.
         figuresComboBox.SelectedIndex = 0;
     }
+    
+    private void AddCustomFigureCheckBox_CheckedChanged(object? sender, EventArgs e)
+    {
+        // Set the boolean field to the state of the addCustomFigureCheckBox.
+        _isAddCustomFigureModeActive = addCustomFigureCheckBox.Checked;
+        
+        // If add figure mode is active, disable the addFigureCheckBox.
+        if (_isAddFigureModeActive)
+        {
+            addFigureCheckBox.Checked = false;
+            addFigureCheckBox_CheckedChanged(this, EventArgs.Empty);
+        }
+        
+        // Update the visibility of the controls based on the state of the addCustomFigureCheckBox.
+        addCustomFigureButton.Visible = _isAddCustomFigureModeActive;
+        resetCustomFigureButton.Visible = _isAddCustomFigureModeActive;
+        cancelCustomFigureButton.Visible = _isAddCustomFigureModeActive;
+        fillColorCustomFigureButton.Visible = _isAddCustomFigureModeActive;
+        borderColorCustomFigureButton.Visible = _isAddCustomFigureModeActive;
+        redoCustomFigureButton.Visible = _isAddCustomFigureModeActive;
+        undoCustomFigureButton.Visible = _isAddCustomFigureModeActive;
+        selectAllCheckBox.Visible = !_isAddCustomFigureModeActive;
+        deleteButton.Visible = !_isAddCustomFigureModeActive;
+        resetButton.Visible = !_isAddCustomFigureModeActive;
+        undoButton.Visible = !_isAddCustomFigureModeActive;
+        redoButton.Visible = !_isAddCustomFigureModeActive;
+        figuresCheckedListBox.Visible = !_isAddCustomFigureModeActive;
+
+        // Add a semi-transparent black layer to the form.
+        BackColor = _isAddCustomFigureModeActive ? Color.FromArgb( 0, 0, 0) :
+            // Remove the semi-transparent black layer from the form.
+            Color.FromArgb(64, 64, 64);
+    }
 
     private void FiguresCheckedListBox_ItemCheck(object? sender, ItemCheckEventArgs e)
     {
@@ -63,6 +107,120 @@ public partial class Form1 : Form
     {
         // Update the coordinatesLabel text with the current mouse position
         coordinatesLabel.Text = $@"Coordinates | X: {e.X}, Y: {e.Y} |";
+    }
+    
+    private void PictureBox1_MouseClick(object? sender, MouseEventArgs e)
+    {
+        if (!_isAddCustomFigureModeActive) return;
+
+        // Add the clicked point to the list of points for the new custom figure.
+        _customFigurePoints.Add(e.Location);
+
+        // Create a temporary bitmap if it doesn't exist.
+        _tempBitmap ??= new Bitmap(pictureBox1.Width, pictureBox1.Height);
+
+        using (var gTemp = Graphics.FromImage(_tempBitmap))
+        {
+            // If there is more than one point, draw a line from the last point to the current point.
+            if (_customFigurePoints.Count > 1)
+            {
+                var pen = new Pen(_borderColor == Color.Empty ? Color.White : _borderColor);
+                gTemp.DrawLine(pen, _customFigurePoints[^2], e.Location);
+            }
+
+            // Draw the points on the canvas.
+            gTemp.FillEllipse(Brushes.Red, e.X - 2, e.Y - 2, 5, 5);
+        }
+
+        // Clear the canvas and re-render the figures.
+        _g.Clear(Color.Transparent);
+        _canvas.Render(_g, pictureBox1);
+
+        // Draw the temporary bitmap onto the canvas.
+        _g.DrawImage(_tempBitmap, 0, 0);
+
+        // If there are 3 or more points, fill the polygon.
+        if (_customFigurePoints.Count >= 3)
+        {
+            var brush = new SolidBrush(_fillColor == Color.Empty ? Color.FromArgb(128, Color.White) : _fillColor);
+            _g.FillPolygon(brush, _customFigurePoints.ToArray());
+        }
+
+        pictureBox1.Refresh();
+    }
+    
+    private void AddCustomFigureButton_Click(object? sender, EventArgs e)
+    {
+        if (_customFigurePoints.Count < 3)
+        {
+            MessageBox.Show(@"A custom figure must have at least 3 points.");
+            return;
+        }
+
+        // Create a new CustomFigure instance with the points that the user has added.
+        var name = _canvas.GenerateUniqueFigureName("Custom");
+
+        var newFigure = new CustomFigure(_customFigurePoints.ToArray(), name)
+        {
+            // Set the border color and fill color of the new figure.
+            BorderColor = _borderColor == Color.Empty ? Color.White : _borderColor,
+            FillColor = _fillColor == Color.Empty ? Color.FromArgb(128, Color.White) : _fillColor
+        };
+
+        // Create an AddFigureOperation for the new figure.
+        var addOperation = new AddFigureOperation(newFigure)
+        {
+            IsNewOperation = true
+        };
+
+        // Execute the operation and push it to the undo stack.
+        addOperation.Execute(_canvas);
+        _canvas.UndoStack.Push(addOperation);
+
+        // Uncheck the addCustomFigureCheckBox.
+        addCustomFigureCheckBox.Checked = false;
+
+        // Clear the temporary bitmap.
+        _tempBitmap?.Dispose();
+        _tempBitmap = new Bitmap(pictureBox1.Width, pictureBox1.Height);
+
+        // Render the canvas.
+        _canvas.Render(_g, pictureBox1);
+
+        // Clear the list of points for the new custom figure.
+        _customFigurePoints.Clear();
+    }
+    
+    private void ResetCustomFigureButton_Click(object? sender, EventArgs e)
+    {
+        // Clear the list of points for the new custom figure.
+        _customFigurePoints.Clear();
+
+        // Clear the temporary bitmap.
+        _tempBitmap?.Dispose();
+        _tempBitmap = new Bitmap(pictureBox1.Width, pictureBox1.Height);
+
+        // Re-render the canvas.
+        _canvas.Render(_g, pictureBox1);
+    }
+    
+    private void CancelCustomFigureButton_Click(object? sender, EventArgs e)
+    {
+        // Clear the list of points for the new custom figure.
+        _customFigurePoints.Clear();
+
+        // Set the boolean field to false.
+        _isAddCustomFigureModeActive = false;
+
+        // Uncheck the addCustomFigureCheckBox.
+        addCustomFigureCheckBox.Checked = false;
+
+        // Clear the temporary bitmap.
+        _tempBitmap?.Dispose();
+        _tempBitmap = new Bitmap(pictureBox1.Width, pictureBox1.Height);
+
+        // Re-render the canvas.
+        _canvas.Render(_g, pictureBox1);
     }
 
     private void OnFigureAdded(Figure figure)
@@ -77,38 +235,47 @@ public partial class Form1 : Form
 
     private void addFigureCheckBox_CheckedChanged(object sender, EventArgs e)
     {
-        var isChecked = addFigureCheckBox.Checked;
-        figuresComboBox.Visible = isChecked;
-        sizeLabel.Visible = isChecked;
-        sizeTextBox.Visible = isChecked;
-        positionLabel.Visible = isChecked;
-        positionXTextBox.Visible = isChecked;
-        positionYTextBox.Visible = isChecked;
-        customPivotCheckBox.Visible = isChecked;
+        // Set the boolean field to the state of the addFigureCheckBox.
+        _isAddFigureModeActive = addFigureCheckBox.Checked;
+        
+        // If custom figure mode is active, disable it and update it
+        if (_isAddCustomFigureModeActive)
+        {
+            addCustomFigureCheckBox.Checked = false;
+            AddCustomFigureCheckBox_CheckedChanged(this, EventArgs.Empty);
+        }
+        
+        figuresComboBox.Visible = _isAddFigureModeActive;
+        sizeLabel.Visible = _isAddFigureModeActive;
+        sizeTextBox.Visible = _isAddFigureModeActive;
+        positionLabel.Visible = _isAddFigureModeActive;
+        positionXTextBox.Visible = _isAddFigureModeActive;
+        positionYTextBox.Visible = _isAddFigureModeActive;
+        customPivotCheckBox.Visible = _isAddFigureModeActive;
         // Pivot components should be visible only if customPivotCheckBox is checked
-        pivotOffsetXTextBox.Visible = isChecked && customPivotCheckBox.Checked;
-        pivotOffsetYTextBox.Visible = isChecked && customPivotCheckBox.Checked;
-        pivotOffsetLabel.Visible = isChecked && customPivotCheckBox.Checked;
-        addFigureButton.Visible = isChecked;
-        borderColorButton.Visible = isChecked;
-        fillColorButton.Visible = isChecked;
+        pivotOffsetXTextBox.Visible = _isAddFigureModeActive && customPivotCheckBox.Checked;
+        pivotOffsetYTextBox.Visible = _isAddFigureModeActive && customPivotCheckBox.Checked;
+        pivotOffsetLabel.Visible = _isAddFigureModeActive && customPivotCheckBox.Checked;
+        addFigureButton.Visible = _isAddFigureModeActive;
+        borderColorButton.Visible = _isAddFigureModeActive;
+        fillColorButton.Visible = _isAddFigureModeActive;
 
         borderColorButton.Location = borderColorButton.Location with
         {
             // Change the Y coordinate of the button based on the visibility of the addFigureCheckBox
-            Y = isChecked ? _originalBorderColorButtonLocation.Y - 65 : _originalBorderColorButtonLocation.Y
+            Y = _isAddFigureModeActive ? _originalBorderColorButtonLocation.Y - 65 : _originalBorderColorButtonLocation.Y
         };
 
         fillColorButton.Location = fillColorButton.Location with
         {
             // Change the Y coordinate of the button based on the visibility of the addFigureCheckBox
-            Y = isChecked ? _originalFillColorButtonLocation.Y - 65 : _originalFillColorButtonLocation.Y
+            Y = _isAddFigureModeActive ? _originalFillColorButtonLocation.Y - 65 : _originalFillColorButtonLocation.Y
         };
 
         addFigureButton.Location = addFigureButton.Location with
         {
             // Change the Y coordinate of the button based on the visibility of the addFigureCheckBox
-            Y = isChecked ? _originalAddButtonLocation.Y - 65 : _originalAddButtonLocation.Y
+            Y = _isAddFigureModeActive ? _originalAddButtonLocation.Y - 65 : _originalAddButtonLocation.Y
         };
     }
 
@@ -133,6 +300,22 @@ public partial class Form1 : Form
         {
             Y = isChecked ? _originalAddButtonLocation.Y : _originalAddButtonLocation.Y - 65
         };
+    }
+    
+    private void borderColorCustomFigureButton_Click(object sender, EventArgs e)
+    {
+        if (borderColorDialog.ShowDialog() == DialogResult.OK)
+        {
+            _borderColor = borderColorDialog.Color;
+        }
+    }
+    
+    private void fillColorCustomFigureButton_Click(object sender, EventArgs e)
+    {
+        if (fillColorDialog.ShowDialog() == DialogResult.OK)
+        {
+            _fillColor = fillColorDialog.Color;
+        }
     }
 
     private void borderColorButton_Click(object sender, EventArgs e)
@@ -172,7 +355,8 @@ public partial class Form1 : Form
         var newFigure = CreateFigure(figureType, size, position, name, pivotOffset);
         // Check if the border is not empty, if it is, set the default color
         newFigure.BorderColor = _borderColor == Color.Empty ? Color.White : _borderColor;
-        newFigure.FillColor = _fillColor;
+        newFigure.FillColor = _fillColor == Color.Empty ? Color.FromArgb(128, Color.White) : _fillColor;
+
         var addOperation = new AddFigureOperation(newFigure)
         {
             IsNewOperation = true

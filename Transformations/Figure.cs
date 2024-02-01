@@ -113,5 +113,13 @@ public class Triangle(double size, PointF position, string name, PointF pivotOff
         new PointF((float)(position.X + size * 50), (float)(position.Y + size * 50))
     ], position, pivotOffset, name);
 
-public class CustomFigure(PointF[] points, PointF position, string name, PointF pivotOffset = default)
-    : Figure(points, position, pivotOffset, name);
+public class CustomFigure(PointF[] points, string name)
+    : Figure(points, CalculateCenter(points), new PointF(0, 0), name)
+{
+    private static PointF CalculateCenter(PointF[] points)
+    {
+        var x = points.Average(p => p.X);
+        var y = points.Average(p => p.Y);
+        return new PointF(x, y);
+    }
+}
