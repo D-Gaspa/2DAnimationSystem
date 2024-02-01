@@ -12,8 +12,8 @@ internal sealed class Canvas
     public readonly Stack<CanvasOperation> UndoStack = new();
     public readonly Stack<CanvasOperation> RedoStack = new();
     
-    public bool CanUndo() => RedoStack.Count > 0;
-    public bool CanRedo() => UndoStack.Count > 0;
+    public bool CanUndo() => UndoStack.Count > 0;
+    public bool CanRedo() => RedoStack.Count > 0;
     
     private int _squareCounter;
     private int _triangleCounter;
@@ -27,6 +27,7 @@ internal sealed class Canvas
         {
             "Square" => $"Square {_squareCounter++}",
             "Triangle" => $"Triangle {_triangleCounter++}",
+            "Custom" => $"Custom {_squareCounter++}",
             _ => throw new InvalidOperationException("Unsupported figure type.")
         };
     }

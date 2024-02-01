@@ -56,6 +56,10 @@
             addCustomFigureButton = new Button();
             resetCustomFigureButton = new Button();
             cancelCustomFigureButton = new Button();
+            borderColorCustomFigureButton = new Button();
+            fillColorCustomFigureButton = new Button();
+            redoCustomFigureButton = new Button();
+            undoCustomFigureButton = new Button();
             ((System.ComponentModel.ISupportInitialize)pictureBox1).BeginInit();
             SuspendLayout();
             // 
@@ -79,31 +83,31 @@
             figuresCheckedListBox.Size = new Size(150, 136);
             figuresCheckedListBox.TabIndex = 10;
             // 
-            // redoButton
-            // 
-            redoButton.BackColor = SystemColors.GrayText;
-            redoButton.Font = new Font("Segoe UI Black", 9F);
-            redoButton.ForeColor = SystemColors.Control;
-            redoButton.Location = new Point(1201, 680);
-            redoButton.Name = "redoButton";
-            redoButton.Size = new Size(68, 30);
-            redoButton.TabIndex = 12;
-            redoButton.Text = "UNDO";
-            redoButton.UseVisualStyleBackColor = false;
-            redoButton.Click += UndoButton_Click;
-            // 
             // undoButton
             // 
             undoButton.BackColor = SystemColors.GrayText;
             undoButton.Font = new Font("Segoe UI Black", 9F);
             undoButton.ForeColor = SystemColors.Control;
-            undoButton.Location = new Point(1283, 680);
+            undoButton.Location = new Point(1201, 680);
             undoButton.Name = "undoButton";
-            undoButton.Size = new Size(69, 30);
-            undoButton.TabIndex = 13;
-            undoButton.Text = "REDO";
+            undoButton.Size = new Size(68, 30);
+            undoButton.TabIndex = 12;
+            undoButton.Text = "UNDO";
             undoButton.UseVisualStyleBackColor = false;
-            undoButton.Click += RedoButton_Click;
+            undoButton.Click += UndoButton_Click;
+            // 
+            // redoButton
+            // 
+            redoButton.BackColor = SystemColors.GrayText;
+            redoButton.Font = new Font("Segoe UI Black", 9F);
+            redoButton.ForeColor = SystemColors.Control;
+            redoButton.Location = new Point(1283, 680);
+            redoButton.Name = "redoButton";
+            redoButton.Size = new Size(69, 30);
+            redoButton.TabIndex = 13;
+            redoButton.Text = "REDO";
+            redoButton.UseVisualStyleBackColor = false;
+            redoButton.Click += RedoButton_Click;
             // 
             // deleteButton
             // 
@@ -353,6 +357,56 @@
             cancelCustomFigureButton.Text = "CANCEL";
             cancelCustomFigureButton.UseVisualStyleBackColor = false;
             // 
+            // borderColorCustomFigureButton
+            // 
+            borderColorCustomFigureButton.BackColor = Color.SteelBlue;
+            borderColorCustomFigureButton.Font = new Font("Segoe UI Black", 7F);
+            borderColorCustomFigureButton.ForeColor = SystemColors.Control;
+            borderColorCustomFigureButton.Location = new Point(221, 6);
+            borderColorCustomFigureButton.Name = "borderColorCustomFigureButton";
+            borderColorCustomFigureButton.Size = new Size(123, 30);
+            borderColorCustomFigureButton.TabIndex = 39;
+            borderColorCustomFigureButton.Text = "BORDER COLOR";
+            borderColorCustomFigureButton.UseVisualStyleBackColor = false;
+            borderColorCustomFigureButton.Click += borderColorCustomFigureButton_Click;
+            // 
+            // fillColorCustomFigureButton
+            // 
+            fillColorCustomFigureButton.BackColor = Color.SteelBlue;
+            fillColorCustomFigureButton.Font = new Font("Segoe UI Black", 7F);
+            fillColorCustomFigureButton.ForeColor = SystemColors.Control;
+            fillColorCustomFigureButton.Location = new Point(350, 6);
+            fillColorCustomFigureButton.Name = "fillColorCustomFigureButton";
+            fillColorCustomFigureButton.Size = new Size(123, 30);
+            fillColorCustomFigureButton.TabIndex = 40;
+            fillColorCustomFigureButton.Text = "FILL COLOR";
+            fillColorCustomFigureButton.UseVisualStyleBackColor = false;
+            fillColorCustomFigureButton.Click += fillColorCustomFigureButton_Click;
+            // 
+            // redoCustomFigureButton
+            // 
+            redoCustomFigureButton.BackColor = SystemColors.GrayText;
+            redoCustomFigureButton.Font = new Font("Segoe UI Black", 9F);
+            redoCustomFigureButton.ForeColor = SystemColors.Control;
+            redoCustomFigureButton.Location = new Point(570, 6);
+            redoCustomFigureButton.Name = "redoCustomFigureButton";
+            redoCustomFigureButton.Size = new Size(69, 30);
+            redoCustomFigureButton.TabIndex = 42;
+            redoCustomFigureButton.Text = "REDO";
+            redoCustomFigureButton.UseVisualStyleBackColor = false;
+            // 
+            // undoCustomFigureButton
+            // 
+            undoCustomFigureButton.BackColor = SystemColors.GrayText;
+            undoCustomFigureButton.Font = new Font("Segoe UI Black", 9F);
+            undoCustomFigureButton.ForeColor = SystemColors.Control;
+            undoCustomFigureButton.Location = new Point(496, 6);
+            undoCustomFigureButton.Name = "undoCustomFigureButton";
+            undoCustomFigureButton.Size = new Size(68, 30);
+            undoCustomFigureButton.TabIndex = 41;
+            undoCustomFigureButton.Text = "UNDO";
+            undoCustomFigureButton.UseVisualStyleBackColor = false;
+            // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
@@ -361,6 +415,10 @@
             AutoSizeMode = AutoSizeMode.GrowAndShrink;
             BackColor = Color.FromArgb(64, 64, 64);
             ClientSize = new Size(1362, 756);
+            Controls.Add(redoCustomFigureButton);
+            Controls.Add(undoCustomFigureButton);
+            Controls.Add(fillColorCustomFigureButton);
+            Controls.Add(borderColorCustomFigureButton);
             Controls.Add(cancelCustomFigureButton);
             Controls.Add(resetCustomFigureButton);
             Controls.Add(addCustomFigureButton);
@@ -426,5 +484,9 @@
         private Button addCustomFigureButton;
         private Button resetCustomFigureButton;
         private Button cancelCustomFigureButton;
+        private Button borderColorCustomFigureButton;
+        private Button fillColorCustomFigureButton;
+        private Button redoCustomFigureButton;
+        private Button undoCustomFigureButton;
     }
 }
