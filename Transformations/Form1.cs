@@ -38,6 +38,7 @@ public partial class Form1 : Form
 
         // Update the button states.
         UpdateButtonStates();
+        UpdateCustomFigureButtonStates();
 
         // Render the canvas.
         _canvas.Render(_g, pictureBox1);
@@ -101,6 +102,18 @@ public partial class Form1 : Form
     {
         // Delay the call to UpdateButtonStates until after the check state has been updated
         BeginInvoke(UpdateButtonStates);
+        
+        // Delay the call to UpdateSelectAllCheckBox until after the check state has been updated
+        BeginInvoke(UpdateSelectAllCheckBox);
+    }
+    
+    private void UpdateSelectAllCheckBox()
+    {
+        // Check if all items are checked
+        var allChecked = figuresCheckedListBox.CheckedItems.Count == figuresCheckedListBox.Items.Count;
+
+        // Update the Checked property of the selectAllCheckBox
+        selectAllCheckBox.Checked = allChecked;
     }
     
     private void PictureBox1_MouseMove(object? sender, MouseEventArgs e)
@@ -116,20 +129,38 @@ public partial class Form1 : Form
         // Add the clicked point to the list of points for the new custom figure.
         _customFigurePoints.Add(e.Location);
 
-        // Create a temporary bitmap if it doesn't exist.
-        _tempBitmap ??= new Bitmap(pictureBox1.Width, pictureBox1.Height);
+        // Redraw the custom figure.
+        RedrawCustomFigure();
+    }
+    
+    private void RedrawCustomFigure()
+    {
+        // If the addCustomFigureCheckBox is not checked or there are no points, return.
+        if (!_isAddCustomFigureModeActive || _customFigurePoints.Count < 1) return;
+
+        // Clear the temporary bitmap.
+        _tempBitmap?.Dispose();
+        _tempBitmap = new Bitmap(pictureBox1.Width, pictureBox1.Height);
 
         using (var gTemp = Graphics.FromImage(_tempBitmap))
         {
-            // If there is more than one point, draw a line from the last point to the current point.
-            if (_customFigurePoints.Count > 1)
+            // If there are 3 or more points, fill the polygon.
+            if (_customFigurePoints.Count >= 3)
             {
-                var pen = new Pen(_borderColor == Color.Empty ? Color.White : _borderColor);
-                gTemp.DrawLine(pen, _customFigurePoints[^2], e.Location);
+                var brush = new SolidBrush(_fillColor == Color.Empty ? Color.FromArgb(128, Color.White) : _fillColor);
+                gTemp.FillPolygon(brush, _customFigurePoints.ToArray());
             }
 
-            // Draw the points on the canvas.
-            gTemp.FillEllipse(Brushes.Red, e.X - 2, e.Y - 2, 5, 5);
+            // Draw the lines and points of the custom figure.
+            var pen = new Pen(_borderColor == Color.Empty ? Color.White : _borderColor);
+            for (var i = 0; i < _customFigurePoints.Count; i++)
+            {
+                if (i > 0)
+                {
+                    gTemp.DrawLine(pen, _customFigurePoints[i - 1], _customFigurePoints[i]);
+                }
+                gTemp.FillEllipse(Brushes.Red, _customFigurePoints[i].X - 2, _customFigurePoints[i].Y - 2, 5, 5);
+            }
         }
 
         // Clear the canvas and re-render the figures.
@@ -139,13 +170,8 @@ public partial class Form1 : Form
         // Draw the temporary bitmap onto the canvas.
         _g.DrawImage(_tempBitmap, 0, 0);
 
-        // If there are 3 or more points, fill the polygon.
-        if (_customFigurePoints.Count >= 3)
-        {
-            var brush = new SolidBrush(_fillColor == Color.Empty ? Color.FromArgb(128, Color.White) : _fillColor);
-            _g.FillPolygon(brush, _customFigurePoints.ToArray());
-        }
-
+        // Update the button states and refresh the picture box.
+        UpdateCustomFigureButtonStates();
         pictureBox1.Refresh();
     }
     
@@ -183,7 +209,7 @@ public partial class Form1 : Form
         // Clear the temporary bitmap.
         _tempBitmap?.Dispose();
         _tempBitmap = new Bitmap(pictureBox1.Width, pictureBox1.Height);
-
+        
         // Render the canvas.
         _canvas.Render(_g, pictureBox1);
 
@@ -200,6 +226,9 @@ public partial class Form1 : Form
         _tempBitmap?.Dispose();
         _tempBitmap = new Bitmap(pictureBox1.Width, pictureBox1.Height);
 
+        // Update the button states.
+        UpdateCustomFigureButtonStates();
+        
         // Re-render the canvas.
         _canvas.Render(_g, pictureBox1);
     }
@@ -304,18 +333,16 @@ public partial class Form1 : Form
     
     private void borderColorCustomFigureButton_Click(object sender, EventArgs e)
     {
-        if (borderColorDialog.ShowDialog() == DialogResult.OK)
-        {
-            _borderColor = borderColorDialog.Color;
-        }
+        if (borderColorDialog.ShowDialog() != DialogResult.OK) return;
+        _borderColor = borderColorDialog.Color;
+        RedrawCustomFigure();
     }
-    
+
     private void fillColorCustomFigureButton_Click(object sender, EventArgs e)
     {
-        if (fillColorDialog.ShowDialog() == DialogResult.OK)
-        {
-            _fillColor = fillColorDialog.Color;
-        }
+        if (fillColorDialog.ShowDialog() != DialogResult.OK) return;
+        _fillColor = fillColorDialog.Color;
+        RedrawCustomFigure();
     }
 
     private void borderColorButton_Click(object sender, EventArgs e)
@@ -366,9 +393,9 @@ public partial class Form1 : Form
         addOperation.Execute(_canvas);
         _canvas.UndoStack.Push(addOperation);
 
-        // Render the canvas.
-        _canvas.Render(_g, pictureBox1);
+        // Update the button states and render the canvas.
         UpdateButtonStates();
+        _canvas.Render(_g, pictureBox1);
     }
 
     private bool ValidateFigureInputs(out double size, out PointF position, out PointF pivotOffset)
@@ -461,6 +488,18 @@ public partial class Form1 : Form
         _canvas.Render(_g, pictureBox1);
         UpdateButtonStates();
     }
+    
+    private void UpdateCustomFigureButtonStates()
+    {
+        redoCustomFigureButton.Enabled = _canvas.CanRedo();
+        redoCustomFigureButton.BackColor = redoCustomFigureButton.Enabled ? Color.Green : DefaultBackColor;
+        
+        undoCustomFigureButton.Enabled = _canvas.CanUndo();
+        undoCustomFigureButton.BackColor = undoCustomFigureButton.Enabled ? Color.Green : DefaultBackColor;
+        
+        addCustomFigureButton.Enabled = _customFigurePoints.Count >= 3;
+        resetCustomFigureButton.Enabled = _customFigurePoints.Count > 0;
+    }
 
     private void UpdateButtonStates()
     {
@@ -497,47 +536,6 @@ public partial class Form1 : Form
         figuresCheckedListBox.Items.Clear();
         _canvas.Render(_g, pictureBox1);
         UpdateButtonStates();
-    }
-
-    private bool ApplyRotation(string figureName)
-    {
-        var figure = _canvas.Figures.FirstOrDefault(f => f.Name == figureName);
-        if (figure == null) return false;
-
-        var angle = 0; // Get the rotation angle
-        var operation = new RotateFigureOperation(figure, angle);
-        operation.Execute(_canvas);
-        _canvas.UndoStack.Push(operation);
-
-        return true;
-    }
-
-    private bool ApplyTranslation(string figureName)
-    {
-        var figure = _canvas.Figures.FirstOrDefault(f => f.Name == figureName);
-        if (figure == null) return false;
-
-        var dx = 0; // Get the translation distance
-        var dy = 0; // Get the translation distance
-        var operation = new TranslateFigureOperation(figure, dx, dy);
-        operation.Execute(_canvas);
-        _canvas.UndoStack.Push(operation);
-
-        return true;
-    }
-
-    private bool ApplyScaling(string figureName)
-    {
-        var figure = _canvas.Figures.FirstOrDefault(f => f.Name == figureName);
-        if (figure == null) return false;
-
-        var sx = 0; // Get the scaling factor
-        var sy = 0; // Get the scaling factor
-        var operation = new ScaleFigureOperation(figure, sx, sy);
-        operation.Execute(_canvas);
-        _canvas.UndoStack.Push(operation);
-
-        return true;
     }
 
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
