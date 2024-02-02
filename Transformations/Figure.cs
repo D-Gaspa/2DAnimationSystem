@@ -1,22 +1,22 @@
-﻿namespace Transformations;
+﻿using System.Drawing.Drawing2D;
+
+namespace Transformations;
+
 public abstract class Figure
 {
     public string Name { get; }
     private PointF[] _points;
-    private readonly PointF[] _originalPoints;
     private PointF _pivot;
-    private readonly PointF _originalPivot;
     public Color BorderColor { get; set; } = Color.White;
     public Color FillColor { get; set; } = Color.Transparent;
+    public bool IsSelected { get; set; }
 
     protected Figure(PointF[] points, PointF position, PointF pivotOffset, string name)
     {
         Name = name;
         _points = points;
-        CalculatePivot(pivotOffset);  // Calculate the pivot point
-        AdjustPositionToPivot(position);  // Adjust the position to match the pivot point
-        _originalPoints = _points;
-        _originalPivot = _pivot;
+        CalculatePivot(pivotOffset); // Calculate the pivot point
+        AdjustPositionToPivot(position); // Adjust the position to match the pivot point
     }
 
     private void CalculatePivot(PointF pivotOffset)
@@ -30,20 +30,6 @@ public abstract class Figure
         _pivot = position; // Adjust pivot to match the specified position
     }
 
-    // Method to reset the figure to its original state
-    public void Reset()
-    {
-        _points = _originalPoints.ToArray();  // Restore the original points
-        _pivot = _originalPivot;  // Restore the original pivot
-    }
-    
-    // Method to restore the figure to a previous state
-    public void Restore(Figure figure)
-    {
-        _points = figure._points;  // Restore the points
-        _pivot = figure._pivot;  // Restore the pivot
-    }
-    
     public void Rotate(double angle)
     {
         var radiansAngle = angle * Math.PI / 180;
@@ -76,6 +62,43 @@ public abstract class Figure
         }).ToArray();
     }
     
+    // Method to check if a point is inside the figure
+    public bool IsInsideFigure(PointF point)
+    {
+        using var path = new GraphicsPath();
+        path.AddPolygon(_points);
+        return path.IsVisible(point);
+    }
+    
+    // Method to get the bounds of the figure
+    public RectangleF GetBounds()
+    {
+        var minX = _points.Min(p => p.X);
+        var minY = _points.Min(p => p.Y);
+        var maxX = _points.Max(p => p.X);
+        var maxY = _points.Max(p => p.Y);
+
+        return new RectangleF(minX, minY, maxX - minX, maxY - minY);
+    }
+
+    // Method to get the selection points
+    public IEnumerable<PointF> GetSelectionPoints()
+    {
+        var bounds = GetBounds();
+
+        return new[]
+        {
+            new PointF(bounds.Left, bounds.Top), // Top-left corner
+            new PointF(bounds.Right, bounds.Top), // Top-right corner
+            new PointF(bounds.Right, bounds.Bottom), // Bottom-right corner
+            new PointF(bounds.Left, bounds.Bottom), // Bottom-left corner
+            new PointF(bounds.Left + bounds.Width / 2, bounds.Top), // Top side
+            new PointF(bounds.Right, bounds.Top + bounds.Height / 2), // Right side
+            new PointF(bounds.Left + bounds.Width / 2, bounds.Bottom), // Bottom side
+            new PointF(bounds.Left, bounds.Top + bounds.Height / 2) // Left side
+        };
+    }
+
     // Method to draw the figure
     public void Draw(Graphics g)
     {
@@ -84,17 +107,11 @@ public abstract class Figure
         using var borderPen = new Pen(BorderColor);
         g.FillPolygon(fillBrush, _points);
         g.DrawPolygon(borderPen, _points);
-        
+
         // Draw the pivot point as a small circle
         const float pivotSize = 5; // Size of the pivot circle
         using var pivotPen = new Pen(Color.Red);
         g.DrawEllipse(pivotPen, _pivot.X - pivotSize / 2, _pivot.Y - pivotSize / 2, pivotSize, pivotSize);
-    }
-    
-    // Method to create a deep copy of the figure
-    public Figure Clone()
-    {
-        return (Figure)MemberwiseClone();
     }
 }
 

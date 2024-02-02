@@ -1,4 +1,6 @@
-﻿namespace Transformations;
+﻿using System.Drawing.Drawing2D;
+
+namespace Transformations;
 internal sealed class Canvas
 {
     //TODO: Implement CustomFigure class to allow the user to draw a custom figure on the canvas.
@@ -66,12 +68,6 @@ internal sealed class Canvas
         FigureRemoved?.Invoke(obj);
     }
     
-    public void ResetFigure(string figureName)
-    {
-        var figure = Figures.FirstOrDefault(f => f.Name == figureName);
-        figure?.Reset();
-    }
-    
     // Undo operation
     public void Undo()
     {
@@ -112,6 +108,24 @@ internal sealed class Canvas
         
         // Draw all figures
         Figures.ForEach(f => f.Draw(g));
+        
+        foreach (var figure in Figures)
+        {
+            figure.Draw(g);
+
+            // Draw the selection points and the selection rectangle
+            if (!figure.IsSelected) continue;
+            var bounds = figure.GetBounds();
+            var pen = new Pen(Color.White) { DashStyle = DashStyle.Dash };
+            g.DrawRectangle(pen, bounds);
+
+            var points = figure.GetSelectionPoints();
+            foreach (var point in points)
+            {
+                // Draw the selection points as small rectangles
+                g.FillRectangle(Brushes.White, point.X - 4, point.Y - 4, 8, 8);
+            }
+        }
 
         // Invalidate the picture box to redraw it
         pictureBox.Invalidate();
