@@ -417,6 +417,7 @@
             redoCustomFigureButton.TabIndex = 42;
             redoCustomFigureButton.Text = "REDO";
             redoCustomFigureButton.UseVisualStyleBackColor = false;
+            redoCustomFigureButton.Click += RedoCustomFigureButton_Click;
             // 
             // undoCustomFigureButton
             // 
@@ -430,6 +431,7 @@
             undoCustomFigureButton.TabIndex = 41;
             undoCustomFigureButton.Text = "UNDO";
             undoCustomFigureButton.UseVisualStyleBackColor = false;
+            undoCustomFigureButton.Click += UndoCustomFigureButton_Click;
             // 
             // Form1
             // 

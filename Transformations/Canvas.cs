@@ -3,26 +3,24 @@
 namespace Transformations;
 internal sealed class Canvas
 {
-    //TODO: Implement CustomFigure class to allow the user to draw a custom figure on the canvas.
-    //TODO: Implement a method to save the canvas to a file, and a button to call it.
-    //TODO: Implement a method to load a canvas from a file, and a button to call it.
-    //TODO: Implement figure selection by clicking on it, displaying its properties and allowing to modify them.
-    //TODO: Implement simple animations (e.g. rotation, translation, scaling).
-    //TODO: Implement responsive canvas (e.g. resize the canvas and the figures should resize accordingly).
-    
     public readonly List<Figure> Figures = [];
+    public readonly List<PointF> CustomFigurePoints = [];
     public readonly Stack<CanvasOperation> UndoStack = new();
     public readonly Stack<CanvasOperation> RedoStack = new();
+    public readonly Stack<CanvasOperation> CustomFigureUndoStack = new();
+    public readonly Stack<CanvasOperation> CustomFigureRedoStack = new();
     
     public bool CanUndo() => UndoStack.Count > 0;
     public bool CanRedo() => RedoStack.Count > 0;
+    public bool CanCustomFigureUndo() => CustomFigureUndoStack.Count > 0;
+    public bool CanCustomFigureRedo() => CustomFigureRedoStack.Count > 0;
     
     private int _squareCounter;
     private int _triangleCounter;
     
     public event Action<Figure>? FigureAdded;
     public event Action<Figure>? FigureRemoved;
-
+    
     public string GenerateUniqueFigureName(string figureType)
     {
         return figureType switch
@@ -68,28 +66,54 @@ internal sealed class Canvas
         FigureRemoved?.Invoke(obj);
     }
     
-    // Undo operation
-    public void Undo()
+    public void AddCustomFigurePoint(PointF point, bool isNewOperation = true)
     {
-        if (!UndoStack.TryPop(out var operation)) return;
+        CustomFigurePoints.Add(point);
         
+        // Clear the redo stack only if it's a new operation
+        if (isNewOperation)
+        {
+            CustomFigureRedoStack.Clear();
+        }
+    }
+    
+    public void RemoveCustomFigurePoint(PointF point, bool isNewOperation = true)
+    {
+        CustomFigurePoints.Remove(point);
+        
+        // Clear the redo stack only if it's a new operation
+        if (isNewOperation)
+        {
+            CustomFigureRedoStack.Clear();
+        }
+    }
+    
+    public void Undo(bool isCustomFigureOperation = false)
+    {
+        var stack = isCustomFigureOperation ? CustomFigureUndoStack : UndoStack;
+        var redoStack = isCustomFigureOperation ? CustomFigureRedoStack : RedoStack;
+
+        if (!stack.TryPop(out var operation)) return;
+
         operation.IsNewOperation = false; // Mark the operation as not new
 
         operation.Undo(this); // Perform the undo operation
-        
-        RedoStack.Push(operation); // Push the operation to the redo stack
+
+        redoStack.Push(operation); // Push the operation to the redo stack
     }
 
-    // Redo operation
-    public void Redo()
+    public void Redo(bool isCustomFigureOperation = false)
     {
-        if (!RedoStack.TryPop(out var operation)) return;
-        
+        var stack = isCustomFigureOperation ? CustomFigureRedoStack : RedoStack;
+        var undoStack = isCustomFigureOperation ? CustomFigureUndoStack : UndoStack;
+
+        if (!stack.TryPop(out var operation)) return;
+
         operation.IsNewOperation = false; // Mark the operation as not new
 
         operation.Execute(this); // Perform the redo operation
-        
-        UndoStack.Push(operation); // Push the operation to the undo stack
+
+        undoStack.Push(operation); // Push the operation to the undo stack
     }
     
     public void Reset()
