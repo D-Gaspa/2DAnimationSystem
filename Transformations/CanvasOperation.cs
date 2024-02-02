@@ -7,7 +7,25 @@ internal abstract class CanvasOperation
     public bool IsNewOperation { get; set; }
 }
 
-// Operation for adding a figure
+internal class BatchCanvasOperation(List<CanvasOperation> operations) : CanvasOperation
+{
+    public override void Execute(Canvas canvas)
+    {
+        foreach (var operation in operations)
+        {
+            operation.Execute(canvas);
+        }
+    }
+
+    public override void Undo(Canvas canvas)
+    {
+        foreach (var operation in operations)
+        {
+            operation.Undo(canvas);
+        }
+    }
+}
+
 internal class AddFigureOperation(Figure figure) : CanvasOperation
 {
     public override void Execute(Canvas canvas)
@@ -21,7 +39,6 @@ internal class AddFigureOperation(Figure figure) : CanvasOperation
     }
 }
 
-// Operation for deleting a figure
 internal class DeleteFigureOperation(Figure figure) : CanvasOperation
 {
     public override void Execute(Canvas canvas)
@@ -79,22 +96,17 @@ internal class ScaleFigureOperation(Figure figure, double sx, double sy) : Trans
     }
 }
 
-// Operation for multiple operations
-internal class BatchCanvasOperation(List<CanvasOperation> operations) : CanvasOperation
+internal class AddPointOperation(PointF point) : CanvasOperation
 {
     public override void Execute(Canvas canvas)
     {
-        foreach (var operation in operations)
-        {
-            operation.Execute(canvas);
-        }
+        // Add the point to CustomFigurePoints
+        canvas.AddCustomFigurePoint(point, IsNewOperation);
     }
 
     public override void Undo(Canvas canvas)
     {
-        foreach (var operation in operations)
-        {
-            operation.Undo(canvas);
-        }
+        // Remove the point from CustomFigurePoints
+        canvas.RemoveCustomFigurePoint(point, IsNewOperation);
     }
 }

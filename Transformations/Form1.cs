@@ -10,7 +10,6 @@ public partial class Form1 : Form
     private Color _fillColor;
     private bool _isAddFigureModeActive;
     private bool _isAddCustomFigureModeActive;
-    private readonly List<PointF> _customFigurePoints = [];
     private Bitmap? _tempBitmap;
     
     public Form1()
@@ -162,8 +161,13 @@ public partial class Form1 : Form
     {
         if (_isAddCustomFigureModeActive)
         {
-            // Add the clicked point to the list of points for the new custom figure.
-            _customFigurePoints.Add(e.Location);
+            // Create an AddPointOperation for the new point
+            var addPointOperation = new AddPointOperation(e.Location)
+            {
+                IsNewOperation = true
+            };
+            addPointOperation.Execute(_canvas);
+            _canvas.CustomFigureUndoStack.Push(addPointOperation);
 
             // Redraw the custom figure.
             RedrawCustomFigure();
@@ -194,8 +198,20 @@ public partial class Form1 : Form
     
     private void RedrawCustomFigure()
     {
-        // If the addCustomFigureCheckBox is not checked or there are no points, return.
-        if (!_isAddCustomFigureModeActive || _customFigurePoints.Count < 1) return;
+        // If the addCustomFigureCheckBox is not checked return.
+        if (!_isAddCustomFigureModeActive) return;
+        
+        // If there are no points, clear the temporary bitmap and re-render the figures.
+        if (_canvas.CustomFigurePoints.Count == 0)
+        {
+            // Clear the temporary bitmap and re-render the figures.
+            _tempBitmap?.Dispose();
+            _tempBitmap = new Bitmap(pictureBox1.Width, pictureBox1.Height);
+            _canvas.Render(_g, pictureBox1);
+            UpdateCustomFigureButtonStates();
+            pictureBox1.Refresh();
+            return;
+        }
 
         // Clear the temporary bitmap.
         _tempBitmap?.Dispose();
@@ -204,21 +220,21 @@ public partial class Form1 : Form
         using (var gTemp = Graphics.FromImage(_tempBitmap))
         {
             // If there are 3 or more points, fill the polygon.
-            if (_customFigurePoints.Count >= 3)
+            if (_canvas.CustomFigurePoints.Count >= 3)
             {
                 var brush = new SolidBrush(_fillColor == Color.Empty ? Color.FromArgb(128, Color.White) : _fillColor);
-                gTemp.FillPolygon(brush, _customFigurePoints.ToArray());
+                gTemp.FillPolygon(brush, _canvas.CustomFigurePoints.ToArray());
             }
 
             // Draw the lines and points of the custom figure.
             var pen = new Pen(_borderColor == Color.Empty ? Color.White : _borderColor);
-            for (var i = 0; i < _customFigurePoints.Count; i++)
+            for (var i = 0; i < _canvas.CustomFigurePoints.Count; i++)
             {
                 if (i > 0)
                 {
-                    gTemp.DrawLine(pen, _customFigurePoints[i - 1], _customFigurePoints[i]);
+                    gTemp.DrawLine(pen, _canvas.CustomFigurePoints[i - 1], _canvas.CustomFigurePoints[i]);
                 }
-                gTemp.FillEllipse(Brushes.Red, _customFigurePoints[i].X - 2, _customFigurePoints[i].Y - 2, 5, 5);
+                gTemp.FillEllipse(Brushes.Red, _canvas.CustomFigurePoints[i].X - 2, _canvas.CustomFigurePoints[i].Y - 2, 5, 5);
             }
         }
 
@@ -248,56 +264,60 @@ public partial class Form1 : Form
     
     private void AddCustomFigureButton_Click(object? sender, EventArgs e)
     {
-        if (_customFigurePoints.Count < 3)
+        if (_canvas.CustomFigurePoints.Count < 3)
         {
             MessageBox.Show(@"A custom figure must have at least 3 points.");
             return;
         }
 
-        // Create a new CustomFigure instance with the points that the user has added.
+        // Create a new CustomFigure instance with the points that the user has added
         var name = _canvas.GenerateUniqueFigureName("Custom");
 
-        var newFigure = new CustomFigure(_customFigurePoints.ToArray(), name)
+        var newFigure = new CustomFigure(_canvas.CustomFigurePoints.ToArray(), name)
         {
-            // Set the border color and fill color of the new figure.
+            // Set the border color and fill color of the new figure
             BorderColor = _borderColor == Color.Empty ? Color.White : _borderColor,
             FillColor = _fillColor == Color.Empty ? Color.FromArgb(128, Color.White) : _fillColor
         };
 
-        // Create an AddFigureOperation for the new figure.
+        // Create an AddFigureOperation for the new figure
         var addOperation = new AddFigureOperation(newFigure)
         {
             IsNewOperation = true
         };
 
-        // Execute the operation and push it to the undo stack.
+        // Execute the operation and push it to the undo stack
         addOperation.Execute(_canvas);
         _canvas.UndoStack.Push(addOperation);
 
         // Uncheck the addCustomFigureCheckBox.
         addCustomFigureCheckBox.Checked = false;
 
-        // Clear the temporary bitmap.
+        // Clear the temporary bitmap and the custom figure stacks
         _tempBitmap?.Dispose();
         _tempBitmap = new Bitmap(pictureBox1.Width, pictureBox1.Height);
+        _canvas.CustomFigureUndoStack.Clear();
+        _canvas.CustomFigureRedoStack.Clear();
         
         // Render the figures
         RenderFigures();
 
-        // Clear the list of points for the new custom figure.
-        _customFigurePoints.Clear();
+        // Clear the list of points for the new custom figure
+        _canvas.CustomFigurePoints.Clear();
     }
     
     private void ResetCustomFigureButton_Click(object? sender, EventArgs e)
     {
-        // Clear the list of points for the new custom figure.
-        _customFigurePoints.Clear();
+        // Clear the list of points for the new custom figure
+        _canvas.CustomFigurePoints.Clear();
 
-        // Clear the temporary bitmap.
+        // Clear the temporary bitmap and the custom figure stacks and the custom figure stacks
         _tempBitmap?.Dispose();
         _tempBitmap = new Bitmap(pictureBox1.Width, pictureBox1.Height);
+        _canvas.CustomFigureUndoStack.Clear();
+        _canvas.CustomFigureRedoStack.Clear();
 
-        // Update the button states.
+        // Update the button states
         UpdateCustomFigureButtonStates();
         
         // Render the figures
@@ -306,18 +326,20 @@ public partial class Form1 : Form
     
     private void CancelCustomFigureButton_Click(object? sender, EventArgs e)
     {
-        // Clear the list of points for the new custom figure.
-        _customFigurePoints.Clear();
+        // Clear the list of points for the new custom figure
+        _canvas.CustomFigurePoints.Clear();
 
-        // Set the boolean field to false.
+        // Set the boolean field to false
         _isAddCustomFigureModeActive = false;
 
-        // Uncheck the addCustomFigureCheckBox.
+        // Uncheck the addCustomFigureCheckBox
         addCustomFigureCheckBox.Checked = false;
 
-        // Clear the temporary bitmap.
+        // Clear the temporary bitmap and the custom figure stacks.
         _tempBitmap?.Dispose();
         _tempBitmap = new Bitmap(pictureBox1.Width, pictureBox1.Height);
+        _canvas.CustomFigureUndoStack.Clear();
+        _canvas.CustomFigureRedoStack.Clear();
 
         // Render the figures
         RenderFigures();
@@ -335,7 +357,7 @@ public partial class Form1 : Form
 
     private void addFigureCheckBox_CheckedChanged(object sender, EventArgs e)
     {
-        // Set the boolean field to the state of the addFigureCheckBox.
+        // Set the boolean field to the state of the addFigureCheckBox
         _isAddFigureModeActive = addFigureCheckBox.Checked;
 
         // If custom figure mode is active, disable it and update it
@@ -345,7 +367,7 @@ public partial class Form1 : Form
             AddCustomFigureCheckBox_CheckedChanged(this, EventArgs.Empty);
         }
         
-        // Update the visibility of the controls based on the state of the addFigureCheckBox.
+        // Update the visibility of the controls based on the state of the addFigureCheckBox
         var controls = new List<Control>
         {
             figuresComboBox, sizeLabel, sizeTextBox, positionLabel, positionXTextBox, positionYTextBox, 
@@ -360,7 +382,7 @@ public partial class Form1 : Form
         };
         SetControlVisibility(pivotControls, isPivotAvailable);
 
-        // Update the location of the controls based on the state of the addFigureCheckBox.
+        // Update the location of the controls based on the state of the addFigureCheckBox
         SetButtonLocation(borderColorButton, borderColorButton.Location with { Y = _isAddFigureModeActive ? _originalBorderColorButtonLocation.Y - 65 : _originalBorderColorButtonLocation.Y });
         SetButtonLocation(fillColorButton, fillColorButton.Location with { Y = _isAddFigureModeActive ? _originalFillColorButtonLocation.Y - 65 : _originalFillColorButtonLocation.Y });
         SetButtonLocation(addFigureButton, addFigureButton.Location with { Y = _isAddFigureModeActive ? _originalAddButtonLocation.Y - 65 : _originalAddButtonLocation.Y });
@@ -569,10 +591,10 @@ public partial class Form1 : Form
     
     private void UpdateCustomFigureButtonStates()
     {
-        UpdateButtonState(redoCustomFigureButton, _canvas.CanRedo(), Color.Green, DefaultBackColor);
-        UpdateButtonState(undoCustomFigureButton, _canvas.CanUndo(), Color.Green, DefaultBackColor);
-        UpdateButtonState(addCustomFigureButton, _customFigurePoints.Count >= 3, Color.MidnightBlue, DefaultBackColor);
-        UpdateButtonState(resetCustomFigureButton, _customFigurePoints.Count > 0, Color.DarkGreen, DefaultBackColor);
+        UpdateButtonState(redoCustomFigureButton, _canvas.CanCustomFigureRedo(), Color.Green, DefaultBackColor);
+        UpdateButtonState(undoCustomFigureButton, _canvas.CanCustomFigureUndo(), Color.Green, DefaultBackColor);
+        UpdateButtonState(addCustomFigureButton, _canvas.CustomFigurePoints.Count >= 3, Color.MidnightBlue, DefaultBackColor);
+        UpdateButtonState(resetCustomFigureButton, _canvas.CustomFigurePoints.Count > 0, Color.DarkGreen, DefaultBackColor);
     }
 
     private void UpdateButtonStates()
@@ -591,28 +613,29 @@ public partial class Form1 : Form
 
     private void UndoButton_Click(object sender, EventArgs e)
     {
-        PerformUndoRedoOperation(true);
+        _canvas.Undo();
+        UpdateAllButtonStates();
+        RenderFigures();
     }
 
     private void RedoButton_Click(object sender, EventArgs e)
     {
-        PerformUndoRedoOperation(false);
+        _canvas.Redo();
+        UpdateAllButtonStates();
+        _canvas.Render(_g, pictureBox1);
     }
     
-    private void PerformUndoRedoOperation(bool isUndoOperation)
+    private void UndoCustomFigureButton_Click(object sender, EventArgs e)
     {
-        if (isUndoOperation)
-        {
-            _canvas.Undo();
-        }
-        else
-        {
-            _canvas.Redo();
-        }
-
-        // Render the figures
+        _canvas.Undo(true);
+        RedrawCustomFigure();
         RenderFigures();
-        UpdateButtonStates();
+    }
+
+    private void RedoCustomFigureButton_Click(object sender, EventArgs e)
+    {
+        _canvas.Redo(true);
+        RedrawCustomFigure();
     }
     
     private void resetButton_Click(object sender, EventArgs e)
