@@ -26,6 +26,17 @@ public partial class Form1 : Form
         _originalFillColorButtonLocation = fillColorButton.Location;
 
         // Subscribe to the events.
+        SubscribeToEvents();
+
+        // Update the button states.
+        UpdateAllButtonStates();
+
+        // Render the canvas.
+        _canvas.Render(_g, pictureBox1);
+    }
+
+    private void SubscribeToEvents()
+    {
         _canvas.FigureAdded += OnFigureAdded;
         _canvas.FigureRemoved += OnFigureRemoved;
         figuresCheckedListBox.ItemCheck += FiguresCheckedListBox_ItemCheck;
@@ -35,13 +46,6 @@ public partial class Form1 : Form
         addCustomFigureButton.Click += AddCustomFigureButton_Click;
         resetCustomFigureButton.Click += ResetCustomFigureButton_Click;
         cancelCustomFigureButton.Click += CancelCustomFigureButton_Click;
-
-        // Update the button states.
-        UpdateButtonStates();
-        UpdateCustomFigureButtonStates();
-
-        // Render the canvas.
-        _canvas.Render(_g, pictureBox1);
     }
 
     private void Form1_Load(object sender, EventArgs e)
@@ -53,7 +57,7 @@ public partial class Form1 : Form
         sizeTextBox.Text = @"1";
         positionXTextBox.Text = @"100";
         positionYTextBox.Text = @"100";
-
+        
         // Select all figures by default.
         selectAllCheckBox.Checked = false;
 
@@ -63,6 +67,11 @@ public partial class Form1 : Form
 
         // Select the first figure type by default.
         figuresComboBox.SelectedIndex = 0;
+    }
+    
+    private void RenderFigures()
+    {
+        _canvas.Render(_g, pictureBox1);
     }
     
     private void AddCustomFigureCheckBox_CheckedChanged(object? sender, EventArgs e)
@@ -78,41 +87,47 @@ public partial class Form1 : Form
         }
         
         // Update the visibility of the controls based on the state of the addCustomFigureCheckBox.
-        addCustomFigureButton.Visible = _isAddCustomFigureModeActive;
-        resetCustomFigureButton.Visible = _isAddCustomFigureModeActive;
-        cancelCustomFigureButton.Visible = _isAddCustomFigureModeActive;
-        fillColorCustomFigureButton.Visible = _isAddCustomFigureModeActive;
-        borderColorCustomFigureButton.Visible = _isAddCustomFigureModeActive;
-        redoCustomFigureButton.Visible = _isAddCustomFigureModeActive;
-        undoCustomFigureButton.Visible = _isAddCustomFigureModeActive;
-        selectAllCheckBox.Visible = !_isAddCustomFigureModeActive;
-        deleteButton.Visible = !_isAddCustomFigureModeActive;
-        resetButton.Visible = !_isAddCustomFigureModeActive;
-        undoButton.Visible = !_isAddCustomFigureModeActive;
-        redoButton.Visible = !_isAddCustomFigureModeActive;
-        figuresCheckedListBox.Visible = !_isAddCustomFigureModeActive;
+        var invisibleControls = new List<Control>
+        {
+            addCustomFigureButton, resetCustomFigureButton, cancelCustomFigureButton, fillColorCustomFigureButton,
+            borderColorCustomFigureButton, redoCustomFigureButton, undoCustomFigureButton
+        };
+        var visibleControls = new List<Control>
+        {
+            selectAllCheckBox, deleteButton, resetButton, undoButton, redoButton, figuresCheckedListBox
+        };
+        SetControlVisibility(invisibleControls, _isAddCustomFigureModeActive);
+        SetControlVisibility(visibleControls, !_isAddCustomFigureModeActive);
         
         // Change the cursor based on the state of the addCustomFigureCheckBox.
         pictureBox1.Cursor = _isAddCustomFigureModeActive ? Cursors.Cross : Cursors.Default;
 
-        // Add a semi-transparent black layer to the form.
-        BackColor = _isAddCustomFigureModeActive ? Color.FromArgb( 0, 0, 0) :
-            // Remove the semi-transparent black layer from the form.
-            Color.FromArgb(64, 64, 64);
+        // Change the background color based on the state of the addCustomFigureCheckBox.
+        BackColor = _isAddCustomFigureModeActive ? Color.Black : Color.FromArgb(64, 64, 64);
         
         DisableFigureSelection();
-        UpdateCustomFigureButtonStates();
-        UpdateButtonStates();
+        UpdateAllButtonStates();
+    }
+    
+    private static void SetControlVisibility(List<Control> controls, bool visibility)
+    {
+        foreach (var control in controls)
+        {
+            control.Visible = visibility;
+        }
     }
 
     private void FiguresCheckedListBox_ItemCheck(object? sender, ItemCheckEventArgs e)
     {
         // Delay the call to UpdateButtonStates until after the check state has been updated
         BeginInvoke(UpdateButtonStates);
-        
+
         // Delay the call to UpdateSelectAllCheckBox until after the check state has been updated
         BeginInvoke(UpdateSelectAllCheckBox);
         
+        // Disable the addFigureCheckBox
+        addFigureCheckBox.Checked = false;
+
         // Get the figure name
         var figureName = figuresCheckedListBox.Items[e.Index].ToString();
         if (figureName == null) return;
@@ -161,31 +176,20 @@ public partial class Form1 : Form
             // If no figure is clicked, deselect all figures and uncheck all checkboxes
             foreach (var figure in _canvas.Figures)
             {
-                figure.IsSelected = false;
-            }
-            for (var i = 0; i < figuresCheckedListBox.Items.Count; i++)
-            {
-                figuresCheckedListBox.SetItemChecked(i, false);
+                SetFigureSelection(figure, false);
             }
         }
         else
         {
             // If a figure is clicked, toggle its selected state
-            clickedFigure.IsSelected = !clickedFigure.IsSelected;
-
-            // Find the corresponding checkbox and update its checked state
-            var index = figuresCheckedListBox.Items.IndexOf(clickedFigure.Name);
-            if (index != -1)
-            {
-                figuresCheckedListBox.SetItemChecked(index, clickedFigure.IsSelected);
-            }
+            SetFigureSelection(clickedFigure, !clickedFigure.IsSelected);
         }
-        
+
         // Disable the addFigureCheckBox
         addFigureCheckBox.Checked = false;
 
-        // Render the canvas
-        _canvas.Render(_g, pictureBox1);
+        // Render the figures
+        RenderFigures();
     }
     
     private void RedrawCustomFigure()
@@ -230,6 +234,18 @@ public partial class Form1 : Form
         pictureBox1.Refresh();
     }
     
+    private void SetFigureSelection(Figure figure, bool isSelected)
+    {
+        figure.IsSelected = isSelected;
+
+        // Find the corresponding checkbox and update its checked state
+        var index = figuresCheckedListBox.Items.IndexOf(figure.Name);
+        if (index != -1)
+        {
+            figuresCheckedListBox.SetItemChecked(index, isSelected);
+        }
+    }
+    
     private void AddCustomFigureButton_Click(object? sender, EventArgs e)
     {
         if (_customFigurePoints.Count < 3)
@@ -265,8 +281,8 @@ public partial class Form1 : Form
         _tempBitmap?.Dispose();
         _tempBitmap = new Bitmap(pictureBox1.Width, pictureBox1.Height);
         
-        // Render the canvas.
-        _canvas.Render(_g, pictureBox1);
+        // Render the figures
+        RenderFigures();
 
         // Clear the list of points for the new custom figure.
         _customFigurePoints.Clear();
@@ -284,8 +300,8 @@ public partial class Form1 : Form
         // Update the button states.
         UpdateCustomFigureButtonStates();
         
-        // Re-render the canvas.
-        _canvas.Render(_g, pictureBox1);
+        // Render the figures
+        RenderFigures();
     }
     
     private void CancelCustomFigureButton_Click(object? sender, EventArgs e)
@@ -303,8 +319,8 @@ public partial class Form1 : Form
         _tempBitmap?.Dispose();
         _tempBitmap = new Bitmap(pictureBox1.Width, pictureBox1.Height);
 
-        // Re-render the canvas.
-        _canvas.Render(_g, pictureBox1);
+        // Render the figures
+        RenderFigures();
     }
 
     private void OnFigureAdded(Figure figure)
@@ -328,39 +344,26 @@ public partial class Form1 : Form
             addCustomFigureCheckBox.Checked = false;
             AddCustomFigureCheckBox_CheckedChanged(this, EventArgs.Empty);
         }
-
-        figuresComboBox.Visible = _isAddFigureModeActive;
-        sizeLabel.Visible = _isAddFigureModeActive;
-        sizeTextBox.Visible = _isAddFigureModeActive;
-        positionLabel.Visible = _isAddFigureModeActive;
-        positionXTextBox.Visible = _isAddFigureModeActive;
-        positionYTextBox.Visible = _isAddFigureModeActive;
-        customPivotCheckBox.Visible = _isAddFigureModeActive;
-        // Pivot components should be visible only if customPivotCheckBox is checked
-        pivotOffsetXTextBox.Visible = _isAddFigureModeActive && customPivotCheckBox.Checked;
-        pivotOffsetYTextBox.Visible = _isAddFigureModeActive && customPivotCheckBox.Checked;
-        pivotOffsetLabel.Visible = _isAddFigureModeActive && customPivotCheckBox.Checked;
-        addFigureButton.Visible = _isAddFigureModeActive;
-        borderColorButton.Visible = _isAddFigureModeActive;
-        fillColorButton.Visible = _isAddFigureModeActive;
-
-        borderColorButton.Location = borderColorButton.Location with
+        
+        // Update the visibility of the controls based on the state of the addFigureCheckBox.
+        var controls = new List<Control>
         {
-            // Change the Y coordinate of the button based on the visibility of the addFigureCheckBox
-            Y = _isAddFigureModeActive ? _originalBorderColorButtonLocation.Y - 65 : _originalBorderColorButtonLocation.Y
+            figuresComboBox, sizeLabel, sizeTextBox, positionLabel, positionXTextBox, positionYTextBox, 
+            customPivotCheckBox, addFigureButton, borderColorButton, fillColorButton
         };
-
-        fillColorButton.Location = fillColorButton.Location with
+        SetControlVisibility(controls, _isAddFigureModeActive);
+        
+        var isPivotAvailable = _isAddFigureModeActive && customPivotCheckBox.Checked;
+        var pivotControls = new List<Control>
         {
-            // Change the Y coordinate of the button based on the visibility of the addFigureCheckBox
-            Y = _isAddFigureModeActive ? _originalFillColorButtonLocation.Y - 65 : _originalFillColorButtonLocation.Y
+            pivotOffsetLabel, pivotOffsetXTextBox, pivotOffsetYTextBox
         };
+        SetControlVisibility(pivotControls, isPivotAvailable);
 
-        addFigureButton.Location = addFigureButton.Location with
-        {
-            // Change the Y coordinate of the button based on the visibility of the addFigureCheckBox
-            Y = _isAddFigureModeActive ? _originalAddButtonLocation.Y - 65 : _originalAddButtonLocation.Y
-        };
+        // Update the location of the controls based on the state of the addFigureCheckBox.
+        SetButtonLocation(borderColorButton, borderColorButton.Location with { Y = _isAddFigureModeActive ? _originalBorderColorButtonLocation.Y - 65 : _originalBorderColorButtonLocation.Y });
+        SetButtonLocation(fillColorButton, fillColorButton.Location with { Y = _isAddFigureModeActive ? _originalFillColorButtonLocation.Y - 65 : _originalFillColorButtonLocation.Y });
+        SetButtonLocation(addFigureButton, addFigureButton.Location with { Y = _isAddFigureModeActive ? _originalAddButtonLocation.Y - 65 : _originalAddButtonLocation.Y });
 
         // Only call DisableFigureSelection when the checkbox is checked
         if (_isAddFigureModeActive)
@@ -394,20 +397,14 @@ public partial class Form1 : Form
         pivotOffsetXTextBox.Visible = isChecked;
         pivotOffsetYTextBox.Visible = isChecked;
 
-        borderColorButton.Location = borderColorButton.Location with
-        {
-            Y = isChecked ? _originalBorderColorButtonLocation.Y : _originalBorderColorButtonLocation.Y - 65
-        };
-
-        fillColorButton.Location = fillColorButton.Location with
-        {
-            Y = isChecked ? _originalFillColorButtonLocation.Y : _originalFillColorButtonLocation.Y - 65
-        };
-
-        addFigureButton.Location = addFigureButton.Location with
-        {
-            Y = isChecked ? _originalAddButtonLocation.Y : _originalAddButtonLocation.Y - 65
-        };
+        SetButtonLocation(borderColorButton, borderColorButton.Location with { Y = isChecked ? _originalBorderColorButtonLocation.Y : _originalBorderColorButtonLocation.Y - 65 });
+        SetButtonLocation(fillColorButton, fillColorButton.Location with { Y = isChecked ? _originalFillColorButtonLocation.Y : _originalFillColorButtonLocation.Y - 65 });
+        SetButtonLocation(addFigureButton, addFigureButton.Location with { Y = isChecked ? _originalAddButtonLocation.Y : _originalAddButtonLocation.Y - 65 });
+    }
+    
+    private static void SetButtonLocation(Control button, Point location)
+    {
+        button.Location = location;
     }
     
     private void borderColorCustomFigureButton_Click(object sender, EventArgs e)
@@ -442,11 +439,11 @@ public partial class Form1 : Form
 
     private void addFigureButton_Click(object sender, EventArgs e)
     {
-        // Validate the inputs.
+        // Validate the inputs
         if (!ValidateFigureInputs(out var size, out var position, out var pivotOffset))
             return;
 
-        // Get the figure type.
+        // Get the figure type
         var figureType = figuresComboBox.SelectedItem?.ToString();
         if (figureType == null)
         {
@@ -454,25 +451,13 @@ public partial class Form1 : Form
             return;
         }
 
-        // Get a unique name for the figure.
+        // Get a unique name for the figure
         var name = _canvas.GenerateUniqueFigureName(figureType);
 
-        // Create and add the figure.
-        var newFigure = CreateFigure(figureType, size, position, name, pivotOffset);
-        // Check if the border is not empty, if it is, set the default color
-        newFigure.BorderColor = _borderColor == Color.Empty ? Color.White : _borderColor;
-        newFigure.FillColor = _fillColor == Color.Empty ? Color.FromArgb(128, Color.White) : _fillColor;
+        // Create and add the figure
+        CreateAndAddFigure(figureType, size, position, name, pivotOffset);
 
-        var addOperation = new AddFigureOperation(newFigure)
-        {
-            IsNewOperation = true
-        };
-
-        // Execute the operation and push it to the undo stack.
-        addOperation.Execute(_canvas);
-        _canvas.UndoStack.Push(addOperation);
-
-        // Update the button states and render the canvas.
+        // Update the button states and render the canvas
         UpdateButtonStates();
         _canvas.Render(_g, pictureBox1);
     }
@@ -508,6 +493,26 @@ public partial class Form1 : Form
         }
 
         return true;
+    }
+    
+    private void CreateAndAddFigure(string figureType, double size, PointF position, string name, PointF pivotOffset)
+    {
+        // Create the figure
+        var newFigure = CreateFigure(figureType, size, position, name, pivotOffset);
+
+        // Set the border and fill colors
+        newFigure.BorderColor = _borderColor == Color.Empty ? Color.White : _borderColor;
+        newFigure.FillColor = _fillColor == Color.Empty ? Color.FromArgb(128, Color.White) : _fillColor;
+
+        // Create an AddFigureOperation for the new figure
+        var addOperation = new AddFigureOperation(newFigure)
+        {
+            IsNewOperation = true
+        };
+
+        // Execute the operation and push it to the undo stack
+        addOperation.Execute(_canvas);
+        _canvas.UndoStack.Push(addOperation);
     }
 
     private static Figure CreateFigure(string figureType, double size, PointF position, string name, PointF pivotOffset)
@@ -556,42 +561,57 @@ public partial class Form1 : Form
         }
     }
     
+    private void UpdateAllButtonStates()
+    {
+        UpdateButtonStates();
+        UpdateCustomFigureButtonStates();
+    }
+    
     private void UpdateCustomFigureButtonStates()
     {
-        redoCustomFigureButton.Enabled = _canvas.CanRedo();
-        redoCustomFigureButton.BackColor = redoCustomFigureButton.Enabled ? Color.Green : DefaultBackColor;
-        
-        undoCustomFigureButton.Enabled = _canvas.CanUndo();
-        undoCustomFigureButton.BackColor = undoCustomFigureButton.Enabled ? Color.Green : DefaultBackColor;
-        
-        addCustomFigureButton.Enabled = _customFigurePoints.Count >= 3;
-        resetCustomFigureButton.Enabled = _customFigurePoints.Count > 0;
+        UpdateButtonState(redoCustomFigureButton, _canvas.CanRedo(), Color.Green, DefaultBackColor);
+        UpdateButtonState(undoCustomFigureButton, _canvas.CanUndo(), Color.Green, DefaultBackColor);
+        UpdateButtonState(addCustomFigureButton, _customFigurePoints.Count >= 3, Color.MidnightBlue, DefaultBackColor);
+        UpdateButtonState(resetCustomFigureButton, _customFigurePoints.Count > 0, Color.DarkGreen, DefaultBackColor);
     }
 
     private void UpdateButtonStates()
     {
-        undoButton.Enabled = _canvas.CanUndo();
-        undoButton.BackColor = undoButton.Enabled ? Color.Green : DefaultBackColor;
-
-        redoButton.Enabled = _canvas.CanRedo();
-        redoButton.BackColor = redoButton.Enabled ? Color.Green : DefaultBackColor;
-        
-        deleteButton.Enabled = figuresCheckedListBox.CheckedItems.Count > 0;
-        
-        resetButton.Enabled = _canvas.Figures.Count > 0 || _canvas.UndoStack.Count > 0 || _canvas.RedoStack.Count > 0;
+        UpdateButtonState(undoButton, _canvas.CanUndo(), Color.Green, DefaultBackColor);
+        UpdateButtonState(redoButton, _canvas.CanRedo(), Color.Green, DefaultBackColor);
+        UpdateButtonState(deleteButton, figuresCheckedListBox.CheckedItems.Count > 0, Color.Red, DefaultBackColor);
+        UpdateButtonState(resetButton, _canvas.Figures.Count > 0 || _canvas.UndoStack.Count > 0 || _canvas.RedoStack.Count > 0, Color.DarkGreen, DefaultBackColor);
+    }
+    
+    private static void UpdateButtonState(Control button, bool condition, Color enabledColor, Color disabledColor)
+    {
+        button.Enabled = condition;
+        button.BackColor = condition ? enabledColor : disabledColor;
     }
 
     private void UndoButton_Click(object sender, EventArgs e)
     {
-        _canvas.Undo();
-        _canvas.Render(_g, pictureBox1);
-        UpdateButtonStates();
+        PerformUndoRedoOperation(true);
     }
 
     private void RedoButton_Click(object sender, EventArgs e)
     {
-        _canvas.Redo();
-        _canvas.Render(_g, pictureBox1);
+        PerformUndoRedoOperation(false);
+    }
+    
+    private void PerformUndoRedoOperation(bool isUndoOperation)
+    {
+        if (isUndoOperation)
+        {
+            _canvas.Undo();
+        }
+        else
+        {
+            _canvas.Redo();
+        }
+
+        // Render the figures
+        RenderFigures();
         UpdateButtonStates();
     }
     
@@ -599,7 +619,8 @@ public partial class Form1 : Form
     {
         _canvas.Reset();
         figuresCheckedListBox.Items.Clear();
-        _canvas.Render(_g, pictureBox1);
+        // Render the figures
+        RenderFigures();
         UpdateButtonStates();
     }
 
