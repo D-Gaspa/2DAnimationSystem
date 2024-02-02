@@ -83,22 +83,10 @@
             figuresCheckedListBox.Size = new Size(150, 136);
             figuresCheckedListBox.TabIndex = 10;
             // 
-            // undoButton
-            // 
-            undoButton.BackColor = SystemColors.GrayText;
-            undoButton.Font = new Font("Segoe UI Black", 9F);
-            undoButton.ForeColor = SystemColors.Control;
-            undoButton.Location = new Point(1201, 680);
-            undoButton.Name = "undoButton";
-            undoButton.Size = new Size(68, 30);
-            undoButton.TabIndex = 12;
-            undoButton.Text = "UNDO";
-            undoButton.UseVisualStyleBackColor = false;
-            undoButton.Click += UndoButton_Click;
-            // 
             // redoButton
             // 
             redoButton.BackColor = SystemColors.GrayText;
+            redoButton.Cursor = Cursors.Hand;
             redoButton.Font = new Font("Segoe UI Black", 9F);
             redoButton.ForeColor = SystemColors.Control;
             redoButton.Location = new Point(1283, 680);
@@ -109,9 +97,24 @@
             redoButton.UseVisualStyleBackColor = false;
             redoButton.Click += RedoButton_Click;
             // 
+            // undoButton
+            // 
+            undoButton.BackColor = SystemColors.GrayText;
+            undoButton.Cursor = Cursors.Hand;
+            undoButton.Font = new Font("Segoe UI Black", 9F);
+            undoButton.ForeColor = SystemColors.Control;
+            undoButton.Location = new Point(1201, 680);
+            undoButton.Name = "undoButton";
+            undoButton.Size = new Size(68, 30);
+            undoButton.TabIndex = 12;
+            undoButton.Text = "UNDO";
+            undoButton.UseVisualStyleBackColor = false;
+            undoButton.Click += UndoButton_Click;
+            // 
             // deleteButton
             // 
             deleteButton.BackColor = Color.Red;
+            deleteButton.Cursor = Cursors.Hand;
             deleteButton.Font = new Font("Segoe UI Black", 9F);
             deleteButton.ForeColor = SystemColors.Control;
             deleteButton.Location = new Point(1201, 641);
@@ -125,6 +128,7 @@
             // figuresComboBox
             // 
             figuresComboBox.BackColor = SystemColors.WindowFrame;
+            figuresComboBox.Cursor = Cursors.Hand;
             figuresComboBox.Font = new Font("Segoe UI Black", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
             figuresComboBox.ForeColor = SystemColors.Control;
             figuresComboBox.FormattingEnabled = true;
@@ -136,6 +140,7 @@
             // sizeTextBox
             // 
             sizeTextBox.BackColor = Color.DimGray;
+            sizeTextBox.Cursor = Cursors.IBeam;
             sizeTextBox.Font = new Font("Segoe UI Black", 10F);
             sizeTextBox.ForeColor = SystemColors.Control;
             sizeTextBox.Location = new Point(1272, 139);
@@ -158,6 +163,7 @@
             // positionYTextBox
             // 
             positionYTextBox.BackColor = Color.DimGray;
+            positionYTextBox.Cursor = Cursors.IBeam;
             positionYTextBox.Font = new Font("Segoe UI Black", 10F);
             positionYTextBox.ForeColor = SystemColors.Control;
             positionYTextBox.Location = new Point(1289, 209);
@@ -168,6 +174,7 @@
             // positionXTextBox
             // 
             positionXTextBox.BackColor = Color.DimGray;
+            positionXTextBox.Cursor = Cursors.IBeam;
             positionXTextBox.Font = new Font("Segoe UI Black", 10F);
             positionXTextBox.ForeColor = SystemColors.Control;
             positionXTextBox.Location = new Point(1201, 209);
@@ -189,6 +196,7 @@
             // pivotOffsetYTextBox
             // 
             pivotOffsetYTextBox.BackColor = Color.DimGray;
+            pivotOffsetYTextBox.Cursor = Cursors.IBeam;
             pivotOffsetYTextBox.Font = new Font("Segoe UI Black", 10F);
             pivotOffsetYTextBox.ForeColor = SystemColors.Control;
             pivotOffsetYTextBox.Location = new Point(1289, 308);
@@ -199,6 +207,7 @@
             // pivotOffsetXTextBox
             // 
             pivotOffsetXTextBox.BackColor = Color.DimGray;
+            pivotOffsetXTextBox.Cursor = Cursors.IBeam;
             pivotOffsetXTextBox.Font = new Font("Segoe UI Black", 10F);
             pivotOffsetXTextBox.ForeColor = SystemColors.Control;
             pivotOffsetXTextBox.Location = new Point(1202, 308);
@@ -220,6 +229,7 @@
             // addFigureButton
             // 
             addFigureButton.BackColor = Color.MidnightBlue;
+            addFigureButton.Cursor = Cursors.Hand;
             addFigureButton.Font = new Font("Segoe UI Black", 9F);
             addFigureButton.ForeColor = SystemColors.Control;
             addFigureButton.Location = new Point(1201, 425);
@@ -233,6 +243,7 @@
             // customPivotCheckBox
             // 
             customPivotCheckBox.AutoSize = true;
+            customPivotCheckBox.Cursor = Cursors.Hand;
             customPivotCheckBox.Location = new Point(1201, 253);
             customPivotCheckBox.Name = "customPivotCheckBox";
             customPivotCheckBox.Size = new Size(155, 24);
@@ -244,6 +255,7 @@
             // addFigureCheckBox
             // 
             addFigureCheckBox.AutoSize = true;
+            addFigureCheckBox.Cursor = Cursors.Hand;
             addFigureCheckBox.Location = new Point(1202, 62);
             addFigureCheckBox.Name = "addFigureCheckBox";
             addFigureCheckBox.Size = new Size(104, 24);
@@ -255,6 +267,7 @@
             // selectAllCheckBox
             // 
             selectAllCheckBox.AutoSize = true;
+            selectAllCheckBox.Cursor = Cursors.Hand;
             selectAllCheckBox.Location = new Point(1205, 468);
             selectAllCheckBox.Name = "selectAllCheckBox";
             selectAllCheckBox.Size = new Size(93, 24);
@@ -266,6 +279,7 @@
             // borderColorButton
             // 
             borderColorButton.BackColor = Color.SteelBlue;
+            borderColorButton.Cursor = Cursors.Hand;
             borderColorButton.Font = new Font("Segoe UI Black", 7F);
             borderColorButton.ForeColor = SystemColors.Control;
             borderColorButton.Location = new Point(1217, 350);
@@ -279,6 +293,7 @@
             // fillColorButton
             // 
             fillColorButton.BackColor = Color.SteelBlue;
+            fillColorButton.Cursor = Cursors.Hand;
             fillColorButton.Font = new Font("Segoe UI Black", 7F);
             fillColorButton.ForeColor = SystemColors.Control;
             fillColorButton.Location = new Point(1217, 386);
@@ -292,6 +307,7 @@
             // resetButton
             // 
             resetButton.BackColor = Color.Green;
+            resetButton.Cursor = Cursors.Hand;
             resetButton.Font = new Font("Segoe UI Black", 9F);
             resetButton.ForeColor = SystemColors.Control;
             resetButton.Location = new Point(1202, 719);
@@ -314,6 +330,7 @@
             // addCustomFigureCheckBox
             // 
             addCustomFigureCheckBox.AutoSize = true;
+            addCustomFigureCheckBox.Cursor = Cursors.Hand;
             addCustomFigureCheckBox.Location = new Point(1202, 32);
             addCustomFigureCheckBox.Name = "addCustomFigureCheckBox";
             addCustomFigureCheckBox.Size = new Size(158, 24);
@@ -324,6 +341,7 @@
             // addCustomFigureButton
             // 
             addCustomFigureButton.BackColor = Color.MidnightBlue;
+            addCustomFigureButton.Cursor = Cursors.Hand;
             addCustomFigureButton.Font = new Font("Segoe UI Black", 9F);
             addCustomFigureButton.ForeColor = SystemColors.Control;
             addCustomFigureButton.Location = new Point(974, 6);
@@ -336,6 +354,7 @@
             // resetCustomFigureButton
             // 
             resetCustomFigureButton.BackColor = Color.Green;
+            resetCustomFigureButton.Cursor = Cursors.Hand;
             resetCustomFigureButton.Font = new Font("Segoe UI Black", 9F);
             resetCustomFigureButton.ForeColor = SystemColors.Control;
             resetCustomFigureButton.Location = new Point(662, 6);
@@ -348,6 +367,7 @@
             // cancelCustomFigureButton
             // 
             cancelCustomFigureButton.BackColor = Color.Red;
+            cancelCustomFigureButton.Cursor = Cursors.Hand;
             cancelCustomFigureButton.Font = new Font("Segoe UI Black", 9F);
             cancelCustomFigureButton.ForeColor = SystemColors.Control;
             cancelCustomFigureButton.Location = new Point(817, 6);
@@ -360,6 +380,7 @@
             // borderColorCustomFigureButton
             // 
             borderColorCustomFigureButton.BackColor = Color.SteelBlue;
+            borderColorCustomFigureButton.Cursor = Cursors.Hand;
             borderColorCustomFigureButton.Font = new Font("Segoe UI Black", 7F);
             borderColorCustomFigureButton.ForeColor = SystemColors.Control;
             borderColorCustomFigureButton.Location = new Point(221, 6);
@@ -373,6 +394,7 @@
             // fillColorCustomFigureButton
             // 
             fillColorCustomFigureButton.BackColor = Color.SteelBlue;
+            fillColorCustomFigureButton.Cursor = Cursors.Hand;
             fillColorCustomFigureButton.Font = new Font("Segoe UI Black", 7F);
             fillColorCustomFigureButton.ForeColor = SystemColors.Control;
             fillColorCustomFigureButton.Location = new Point(350, 6);
@@ -386,6 +408,7 @@
             // redoCustomFigureButton
             // 
             redoCustomFigureButton.BackColor = SystemColors.GrayText;
+            redoCustomFigureButton.Cursor = Cursors.Hand;
             redoCustomFigureButton.Font = new Font("Segoe UI Black", 9F);
             redoCustomFigureButton.ForeColor = SystemColors.Control;
             redoCustomFigureButton.Location = new Point(570, 6);
@@ -398,6 +421,7 @@
             // undoCustomFigureButton
             // 
             undoCustomFigureButton.BackColor = SystemColors.GrayText;
+            undoCustomFigureButton.Cursor = Cursors.Hand;
             undoCustomFigureButton.Font = new Font("Segoe UI Black", 9F);
             undoCustomFigureButton.ForeColor = SystemColors.Control;
             undoCustomFigureButton.Location = new Point(496, 6);

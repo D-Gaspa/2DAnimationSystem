@@ -55,7 +55,7 @@ public partial class Form1 : Form
         positionYTextBox.Text = @"100";
 
         // Select all figures by default.
-        selectAllCheckBox.Checked = true;
+        selectAllCheckBox.Checked = false;
 
         // Add the figure types to the combo box.
         figuresComboBox.Items.Add("Square");
@@ -91,11 +91,18 @@ public partial class Form1 : Form
         undoButton.Visible = !_isAddCustomFigureModeActive;
         redoButton.Visible = !_isAddCustomFigureModeActive;
         figuresCheckedListBox.Visible = !_isAddCustomFigureModeActive;
+        
+        // Change the cursor based on the state of the addCustomFigureCheckBox.
+        pictureBox1.Cursor = _isAddCustomFigureModeActive ? Cursors.Cross : Cursors.Default;
 
         // Add a semi-transparent black layer to the form.
         BackColor = _isAddCustomFigureModeActive ? Color.FromArgb( 0, 0, 0) :
             // Remove the semi-transparent black layer from the form.
             Color.FromArgb(64, 64, 64);
+        
+        DisableFigureSelection();
+        UpdateCustomFigureButtonStates();
+        UpdateButtonStates();
     }
 
     private void FiguresCheckedListBox_ItemCheck(object? sender, ItemCheckEventArgs e)
@@ -105,12 +112,26 @@ public partial class Form1 : Form
         
         // Delay the call to UpdateSelectAllCheckBox until after the check state has been updated
         BeginInvoke(UpdateSelectAllCheckBox);
+        
+        // Get the figure name
+        var figureName = figuresCheckedListBox.Items[e.Index].ToString();
+        if (figureName == null) return;
+
+        // Find the figure with the given name
+        var figure = _canvas.Figures.FirstOrDefault(f => f.Name == figureName);
+        if (figure == null) return;
+
+        // Select or deselect the figure based on the new check state
+        figure.IsSelected = e.NewValue == CheckState.Checked;
+
+        // Render the canvas
+        _canvas.Render(_g, pictureBox1);
     }
     
     private void UpdateSelectAllCheckBox()
     {
-        // Check if all items are checked
-        var allChecked = figuresCheckedListBox.CheckedItems.Count == figuresCheckedListBox.Items.Count;
+        // Check if all figures are selected
+        var allChecked = _canvas.Figures.All(f => f.IsSelected);
 
         // Update the Checked property of the selectAllCheckBox
         selectAllCheckBox.Checked = allChecked;
@@ -124,13 +145,47 @@ public partial class Form1 : Form
     
     private void PictureBox1_MouseClick(object? sender, MouseEventArgs e)
     {
-        if (!_isAddCustomFigureModeActive) return;
+        if (_isAddCustomFigureModeActive)
+        {
+            // Add the clicked point to the list of points for the new custom figure.
+            _customFigurePoints.Add(e.Location);
 
-        // Add the clicked point to the list of points for the new custom figure.
-        _customFigurePoints.Add(e.Location);
+            // Redraw the custom figure.
+            RedrawCustomFigure();
+            return;
+        }
+        // Check if a figure is clicked
+        var clickedFigure = _canvas.Figures.FirstOrDefault(f => f.IsInsideFigure(e.Location));
+        if (clickedFigure == null)
+        {
+            // If no figure is clicked, deselect all figures and uncheck all checkboxes
+            foreach (var figure in _canvas.Figures)
+            {
+                figure.IsSelected = false;
+            }
+            for (var i = 0; i < figuresCheckedListBox.Items.Count; i++)
+            {
+                figuresCheckedListBox.SetItemChecked(i, false);
+            }
+        }
+        else
+        {
+            // If a figure is clicked, toggle its selected state
+            clickedFigure.IsSelected = !clickedFigure.IsSelected;
 
-        // Redraw the custom figure.
-        RedrawCustomFigure();
+            // Find the corresponding checkbox and update its checked state
+            var index = figuresCheckedListBox.Items.IndexOf(clickedFigure.Name);
+            if (index != -1)
+            {
+                figuresCheckedListBox.SetItemChecked(index, clickedFigure.IsSelected);
+            }
+        }
+        
+        // Disable the addFigureCheckBox
+        addFigureCheckBox.Checked = false;
+
+        // Render the canvas
+        _canvas.Render(_g, pictureBox1);
     }
     
     private void RedrawCustomFigure()
@@ -266,14 +321,14 @@ public partial class Form1 : Form
     {
         // Set the boolean field to the state of the addFigureCheckBox.
         _isAddFigureModeActive = addFigureCheckBox.Checked;
-        
+
         // If custom figure mode is active, disable it and update it
         if (_isAddCustomFigureModeActive)
         {
             addCustomFigureCheckBox.Checked = false;
             AddCustomFigureCheckBox_CheckedChanged(this, EventArgs.Empty);
         }
-        
+
         figuresComboBox.Visible = _isAddFigureModeActive;
         sizeLabel.Visible = _isAddFigureModeActive;
         sizeTextBox.Visible = _isAddFigureModeActive;
@@ -306,6 +361,30 @@ public partial class Form1 : Form
             // Change the Y coordinate of the button based on the visibility of the addFigureCheckBox
             Y = _isAddFigureModeActive ? _originalAddButtonLocation.Y - 65 : _originalAddButtonLocation.Y
         };
+
+        // Only call DisableFigureSelection when the checkbox is checked
+        if (_isAddFigureModeActive)
+        {
+            DisableFigureSelection();
+        }
+    }
+
+    private void DisableFigureSelection()
+    {
+        // Deselect all figures
+        foreach (var figure in _canvas.Figures)
+        {
+            figure.IsSelected = false;
+        }
+
+        // Uncheck all checkboxes
+        for (var i = 0; i < figuresCheckedListBox.Items.Count; i++)
+        {
+            figuresCheckedListBox.SetItemChecked(i, false);
+        }
+
+        // Render the canvas
+        _canvas.Render(_g, pictureBox1);
     }
 
     private void customPivotCheckBox_CheckedChanged(object sender, EventArgs e)
@@ -443,7 +522,7 @@ public partial class Form1 : Form
 
     private void AddFigureToCheckList(string name)
     {
-        figuresCheckedListBox.Items.Add(name, true); // Add to CheckedListBox and set as checked
+        figuresCheckedListBox.Items.Add(name, false); // Add to CheckedListBox and set as unchecked
     }
 
     private void selectAllCheckBox_CheckedChanged(object sender, EventArgs e)
@@ -456,28 +535,10 @@ public partial class Form1 : Form
 
     private void DeleteButton_Click(object sender, EventArgs e)
     {
-        var operations = new List<CanvasOperation>();
-
-        // Create a delete operation for each checked figure
-        var index = 0;
-        for (; index < figuresCheckedListBox.CheckedItems.Count; index++)
-        {
-            var item = figuresCheckedListBox.CheckedItems[index];
-            // Get the figure name
-            var figureName = item?.ToString();
-            if (figureName == null) continue;
-
-            // Find the figure with the given name
-            var figure = _canvas.Figures.FirstOrDefault(f => f.Name == figureName);
-            if (figure == null) continue;
-
-            // Create a delete operation and add it to the list
-            var operation = new DeleteFigureOperation(figure)
-            {
-                IsNewOperation = true
-            };
-            operations.Add(operation);
-        }
+        // Create a delete operation for each selected figure
+        var operations = _canvas.Figures.Where(f => f.IsSelected)
+            .Select(figure => new DeleteFigureOperation(figure) { IsNewOperation = true }).Cast<CanvasOperation>()
+            .ToList();
 
         // Execute the batch operation and push it to the undo stack
         var batchOperation = new BatchCanvasOperation(operations);
@@ -487,6 +548,12 @@ public partial class Form1 : Form
         // Render the canvas
         _canvas.Render(_g, pictureBox1);
         UpdateButtonStates();
+
+        // Check if all items are deleted and uncheck the selectAllCheckBox
+        if (_canvas.Figures.Count == 0)
+        {
+            selectAllCheckBox.Checked = false;
+        }
     }
     
     private void UpdateCustomFigureButtonStates()
@@ -504,11 +571,9 @@ public partial class Form1 : Form
     private void UpdateButtonStates()
     {
         undoButton.Enabled = _canvas.CanUndo();
-        // Change background color of the button to green if it is enabled
         undoButton.BackColor = undoButton.Enabled ? Color.Green : DefaultBackColor;
 
         redoButton.Enabled = _canvas.CanRedo();
-        // Change background color of the button to green if it is enabled
         redoButton.BackColor = redoButton.Enabled ? Color.Green : DefaultBackColor;
         
         deleteButton.Enabled = figuresCheckedListBox.CheckedItems.Count > 0;
@@ -543,7 +608,14 @@ public partial class Form1 : Form
         switch (keyData)
         {
             case Keys.Enter:
-                addFigureButton_Click(this, EventArgs.Empty);
+                if (_isAddFigureModeActive)
+                {
+                    addFigureButton_Click(this, EventArgs.Empty);
+                }
+                else if (_isAddCustomFigureModeActive)
+                {
+                    AddCustomFigureButton_Click(this, EventArgs.Empty);
+                }
                 break;
             case Keys.Left:
                 ApplyTranslationToSelectedFigures(-10, 0);
@@ -564,26 +636,10 @@ public partial class Form1 : Form
 
     private void ApplyTranslationToSelectedFigures(int dx, int dy)
     {
-        var operations = new List<CanvasOperation>();
-
-        // Create a translation operation for each checked figure
-        var index = 0;
-        for (; index < figuresCheckedListBox.CheckedItems.Count; index++)
-        {
-            // Get the figure name
-            var item = figuresCheckedListBox.CheckedItems[index];
-            var figureName = item?.ToString();
-            if (figureName == null) continue;
-
-            // Find the figure with the given name
-            var figure = _canvas.Figures.FirstOrDefault(f => f.Name == figureName);
-            if (figure == null) continue;
-
-            // Create a translation operation and add it to the list
-            var operation = new TranslateFigureOperation(figure, dx, dy);
-            operations.Add(operation);
-        }
-
+        // Create a translation operation for each selected figure
+        var operations = _canvas.Figures.Where(f => f.IsSelected)
+            .Select(figure => new TranslateFigureOperation(figure, dx, dy)).Cast<CanvasOperation>().ToList();
+        
         // Execute the batch operation and push it to the undo stack
         var batchOperation = new BatchCanvasOperation(operations);
         batchOperation.Execute(_canvas);
