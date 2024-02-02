@@ -9,9 +9,11 @@ internal abstract class CanvasOperation
 
 internal class BatchCanvasOperation(List<CanvasOperation> operations) : CanvasOperation
 {
+    public List<CanvasOperation> Operations { get; } = operations;
+
     public override void Execute(Canvas canvas)
     {
-        foreach (var operation in operations)
+        foreach (var operation in Operations)
         {
             operation.Execute(canvas);
         }
@@ -19,7 +21,7 @@ internal class BatchCanvasOperation(List<CanvasOperation> operations) : CanvasOp
 
     public override void Undo(Canvas canvas)
     {
-        foreach (var operation in operations)
+        foreach (var operation in Operations)
         {
             operation.Undo(canvas);
         }
@@ -61,12 +63,12 @@ internal class RotateFigureOperation(Figure figure, double angle) : TransformFig
 {
     public override void Execute(Canvas canvas)
     {
-        Figure.Rotate(angle);
+        canvas.RotateFigure(Figure, angle, IsNewOperation);
     }
 
     public override void Undo(Canvas canvas)
     {
-        Figure.Rotate(-angle);
+        canvas.RotateFigure(Figure, -angle, IsNewOperation);
     }
 }
 
@@ -74,12 +76,12 @@ internal class TranslateFigureOperation(Figure figure, double dx, double dy) : T
 {
     public override void Execute(Canvas canvas)
     {
-        Figure.Translate(dx, dy);
+        canvas.TranslateFigure(Figure, dx, dy, IsNewOperation);
     }
 
     public override void Undo(Canvas canvas)
     {
-        Figure.Translate(-dx, -dy);
+        canvas.TranslateFigure(Figure, -dx, -dy, IsNewOperation);
     }
 }
 
@@ -87,26 +89,54 @@ internal class ScaleFigureOperation(Figure figure, double sx, double sy) : Trans
 {
     public override void Execute(Canvas canvas)
     {
-        Figure.Scale(sx, sy);
+        canvas.ScaleFigure(Figure, sx, sy, IsNewOperation);
     }
 
     public override void Undo(Canvas canvas)
     {
-        Figure.Scale(1/sx, 1/sy);
+        canvas.ScaleFigure(Figure, 1 / sx, 1 / sy, IsNewOperation);
     }
 }
 
-internal class AddPointOperation(PointF point) : CanvasOperation
+internal class AddUnfinishedCustomFigurePointOperation(UnfinishedCustomFigure figure, PointF point) : CanvasOperation
 {
     public override void Execute(Canvas canvas)
     {
-        // Add the point to CustomFigurePoints
-        canvas.AddCustomFigurePoint(point, IsNewOperation);
+        canvas.AddUnfinishedCustomFigurePoint(figure, point, IsNewOperation);
     }
 
     public override void Undo(Canvas canvas)
     {
-        // Remove the point from CustomFigurePoints
-        canvas.RemoveCustomFigurePoint(point, IsNewOperation);
+        canvas.RemoveUnfinishedCustomFigurePoint(figure, IsNewOperation);
+    }
+}
+
+internal class ChangeFillColorOperation(Figure figure, Color newColor) : CanvasOperation
+{
+    private readonly Color _oldColor = figure.FillColor;
+
+    public override void Execute(Canvas canvas)
+    {
+        canvas.ChangeFillColor(figure, newColor, IsNewOperation);
+    }
+
+    public override void Undo(Canvas canvas)
+    {
+        canvas.ChangeFillColor(figure, _oldColor, IsNewOperation);
+    }
+}
+
+internal class ChangeBorderColorOperation(Figure figure, Color newColor) : CanvasOperation
+{
+    private readonly Color _oldColor = figure.BorderColor;
+
+    public override void Execute(Canvas canvas)
+    {
+        canvas.ChangeBorderColor(figure, newColor, IsNewOperation);
+    }
+
+    public override void Undo(Canvas canvas)
+    {
+        canvas.ChangeBorderColor(figure, _oldColor, IsNewOperation);
     }
 }

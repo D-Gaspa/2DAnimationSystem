@@ -6,11 +6,11 @@ public partial class Form1 : Form
     private readonly Point _originalAddButtonLocation;
     private readonly Point _originalBorderColorButtonLocation;
     private readonly Point _originalFillColorButtonLocation;
+    private UnfinishedCustomFigure _unfinishedCustomFigure = null!;
     private Color _borderColor;
     private Color _fillColor;
     private bool _isAddFigureModeActive;
     private bool _isAddCustomFigureModeActive;
-    private Bitmap? _tempBitmap;
     
     public Form1()
     {
@@ -155,14 +155,120 @@ public partial class Form1 : Form
     {
         // Update the coordinatesLabel text with the current mouse position
         coordinatesLabel.Text = $@"Coordinates | X: {e.X}, Y: {e.Y} |";
+
+        // Check if a figure is selected
+        var selectedFigures = _canvas.Figures.Where(f => f.IsSelected).ToList();
+        if (selectedFigures.Count == 0)
+        {
+            pictureBox1.Cursor = Cursors.Default;
+            return;
+        }
+
+        foreach (var bounds in selectedFigures.Select(selectedFigure => selectedFigure.GetBounds()))
+        {
+            // Check if the cursor is inside the selection rectangle
+            if (bounds.Contains(e.Location))
+            {
+                pictureBox1.Cursor = Cursors.SizeAll;
+                return;
+            }
+
+            if (IsCursorAtCorner(bounds, e.Location))
+            {
+                // Change the cursor based on its position relative to the figure's bounding rectangle
+                pictureBox1.Cursor = GetCursorForCorner(bounds, e.Location);
+                return;
+            }
+
+            if (!IsCursorAtSide(bounds, e.Location)) continue;
+            // Change the cursor based on its position relative to the figure's bounding rectangle
+            pictureBox1.Cursor = GetCursorForSide(bounds, e.Location);
+            return;
+        }
+
+        pictureBox1.Cursor = Cursors.Default;
+    }
+    
+    private static bool IsCursorAtCorner(RectangleF bounds, PointF point)
+    {
+        // Define a tolerance for how close the cursor needs to be to a corner
+        const float tolerance = 10;
+
+        // Check each corner
+        var corners = new[]
+        {
+            new PointF(bounds.Left, bounds.Top),
+            new PointF(bounds.Right, bounds.Top),
+            new PointF(bounds.Left, bounds.Bottom),
+            new PointF(bounds.Right, bounds.Bottom)
+        };
+
+        return corners.Any(corner => Math.Abs(corner.X - point.X) <= tolerance && Math.Abs(corner.Y - point.Y) <= tolerance);
+    }
+
+    private static Cursor GetCursorForCorner(RectangleF bounds, PointF point)
+    {
+        // Define a tolerance for how close the cursor needs to be to a corner
+        const float tolerance = 10;
+
+        // Check each corner
+        if (Math.Abs(bounds.Left - point.X) <= tolerance && Math.Abs(bounds.Top - point.Y) <= tolerance ||
+            Math.Abs(bounds.Right - point.X) <= tolerance && Math.Abs(bounds.Bottom - point.Y) <= tolerance)
+        {
+            return Cursors.SizeNWSE;
+        }
+
+        if (Math.Abs(bounds.Right - point.X) <= tolerance && Math.Abs(bounds.Top - point.Y) <= tolerance ||
+            Math.Abs(bounds.Left - point.X) <= tolerance && Math.Abs(bounds.Bottom - point.Y) <= tolerance)
+        {
+            return Cursors.SizeNESW;
+        }
+
+        return Cursors.Default;
+    }
+
+    private static bool IsCursorAtSide(RectangleF bounds, PointF point)
+    {
+        // Define a tolerance for how close the cursor needs to be to a side
+        const float tolerance = 10;
+
+        // Check each side
+        return Math.Abs(bounds.Left - point.X) <= tolerance || Math.Abs(bounds.Right - point.X) <= tolerance ||
+               Math.Abs(bounds.Top - point.Y) <= tolerance || Math.Abs(bounds.Bottom - point.Y) <= tolerance;
+    }
+
+    private static Cursor GetCursorForSide(RectangleF bounds, PointF point)
+    {
+        // Define a tolerance for how close the cursor needs to be to a side
+        const float tolerance = 10;
+
+        // Check each side
+        if (Math.Abs(bounds.Left - point.X) <= tolerance || Math.Abs(bounds.Right - point.X) <= tolerance)
+        {
+            return Cursors.SizeWE;
+        }
+
+        if (Math.Abs(bounds.Top - point.Y) <= tolerance || Math.Abs(bounds.Bottom - point.Y) <= tolerance)
+        {
+            return Cursors.SizeNS;
+        }
+
+        return Cursors.Default;
     }
     
     private void PictureBox1_MouseClick(object? sender, MouseEventArgs e)
     {
         if (_isAddCustomFigureModeActive)
         {
-            // Create an AddPointOperation for the new point
-            var addPointOperation = new AddPointOperation(e.Location)
+            if (_canvas.CustomFigurePoints.Count == 0)
+            {
+                // Create a new UnfinishedCustomFigure and add it to the canvas with the first point
+                _unfinishedCustomFigure = new UnfinishedCustomFigure([e.Location], "Custom");
+                _canvas.AddFigure(_unfinishedCustomFigure);
+            }
+
+            // Add the point to the unfinishedCustomFigure
+            var addPointOperation = new AddUnfinishedCustomFigurePointOperation(_unfinishedCustomFigure, e.Location)
             {
                 IsNewOperation = true
             };
@@ -200,50 +306,12 @@ public partial class Form1 : Form
     {
         // If the addCustomFigureCheckBox is not checked return.
         if (!_isAddCustomFigureModeActive) return;
-        
-        // If there are no points, clear the temporary bitmap and re-render the figures.
-        if (_canvas.CustomFigurePoints.Count == 0)
-        {
-            // Clear the temporary bitmap and re-render the figures.
-            _tempBitmap?.Dispose();
-            _tempBitmap = new Bitmap(pictureBox1.Width, pictureBox1.Height);
-            _canvas.Render(_g, pictureBox1);
-            UpdateCustomFigureButtonStates();
-            pictureBox1.Refresh();
-            return;
-        }
-
-        // Clear the temporary bitmap.
-        _tempBitmap?.Dispose();
-        _tempBitmap = new Bitmap(pictureBox1.Width, pictureBox1.Height);
-
-        using (var gTemp = Graphics.FromImage(_tempBitmap))
-        {
-            // If there are 3 or more points, fill the polygon.
-            if (_canvas.CustomFigurePoints.Count >= 3)
-            {
-                var brush = new SolidBrush(_fillColor == Color.Empty ? Color.FromArgb(128, Color.White) : _fillColor);
-                gTemp.FillPolygon(brush, _canvas.CustomFigurePoints.ToArray());
-            }
-
-            // Draw the lines and points of the custom figure.
-            var pen = new Pen(_borderColor == Color.Empty ? Color.White : _borderColor);
-            for (var i = 0; i < _canvas.CustomFigurePoints.Count; i++)
-            {
-                if (i > 0)
-                {
-                    gTemp.DrawLine(pen, _canvas.CustomFigurePoints[i - 1], _canvas.CustomFigurePoints[i]);
-                }
-                gTemp.FillEllipse(Brushes.Red, _canvas.CustomFigurePoints[i].X - 2, _canvas.CustomFigurePoints[i].Y - 2, 5, 5);
-            }
-        }
 
         // Clear the canvas and re-render the figures.
         _g.Clear(Color.Transparent);
-        _canvas.Render(_g, pictureBox1);
-
-        // Draw the temporary bitmap onto the canvas.
-        _g.DrawImage(_tempBitmap, 0, 0);
+        
+        // Render the figures
+        RenderFigures();
 
         // Update the button states and refresh the picture box.
         UpdateCustomFigureButtonStates();
@@ -269,6 +337,9 @@ public partial class Form1 : Form
             MessageBox.Show(@"A custom figure must have at least 3 points.");
             return;
         }
+        
+        // Remove the unfinished custom figure from the canvas
+        _canvas.Figures.Remove(_unfinishedCustomFigure);
 
         // Create a new CustomFigure instance with the points that the user has added
         var name = _canvas.GenerateUniqueFigureName("Custom");
@@ -293,11 +364,11 @@ public partial class Form1 : Form
         // Uncheck the addCustomFigureCheckBox.
         addCustomFigureCheckBox.Checked = false;
 
-        // Clear the temporary bitmap and the custom figure stacks
-        _tempBitmap?.Dispose();
-        _tempBitmap = new Bitmap(pictureBox1.Width, pictureBox1.Height);
+        // Clear the custom figure stacks
         _canvas.CustomFigureUndoStack.Clear();
         _canvas.CustomFigureRedoStack.Clear();
+        
+        _unfinishedCustomFigure = null!;
         
         // Render the figures
         RenderFigures();
@@ -311,12 +382,14 @@ public partial class Form1 : Form
         // Clear the list of points for the new custom figure
         _canvas.CustomFigurePoints.Clear();
 
-        // Clear the temporary bitmap and the custom figure stacks and the custom figure stacks
-        _tempBitmap?.Dispose();
-        _tempBitmap = new Bitmap(pictureBox1.Width, pictureBox1.Height);
+        // Clear custom figure stacks
         _canvas.CustomFigureUndoStack.Clear();
         _canvas.CustomFigureRedoStack.Clear();
-
+        
+        _unfinishedCustomFigure = null!;
+        
+        _canvas.Reset();
+        
         // Update the button states
         UpdateCustomFigureButtonStates();
         
@@ -335,11 +408,12 @@ public partial class Form1 : Form
         // Uncheck the addCustomFigureCheckBox
         addCustomFigureCheckBox.Checked = false;
 
-        // Clear the temporary bitmap and the custom figure stacks.
-        _tempBitmap?.Dispose();
-        _tempBitmap = new Bitmap(pictureBox1.Width, pictureBox1.Height);
+        // Clear the custom figure stacks.
         _canvas.CustomFigureUndoStack.Clear();
         _canvas.CustomFigureRedoStack.Clear();
+        
+        _unfinishedCustomFigure = null!;
+        _canvas.Reset();
 
         // Render the figures
         RenderFigures();
@@ -433,6 +507,15 @@ public partial class Form1 : Form
     {
         if (borderColorDialog.ShowDialog() != DialogResult.OK) return;
         _borderColor = borderColorDialog.Color;
+        
+        // Create a ChangeBorderColorOperation
+        var operation = new ChangeBorderColorOperation(_unfinishedCustomFigure, _borderColor)
+        {
+            IsNewOperation = true
+        };
+        operation.Execute(_canvas);
+        _canvas.CustomFigureUndoStack.Push(operation);
+        
         RedrawCustomFigure();
     }
 
@@ -440,6 +523,15 @@ public partial class Form1 : Form
     {
         if (fillColorDialog.ShowDialog() != DialogResult.OK) return;
         _fillColor = fillColorDialog.Color;
+        
+        // Create a ChangeFillColorOperation
+        var operation = new ChangeFillColorOperation(_unfinishedCustomFigure, _fillColor)
+        {
+            IsNewOperation = true
+        };
+        operation.Execute(_canvas);
+        _canvas.CustomFigureUndoStack.Push(operation);
+        
         RedrawCustomFigure();
     }
 
@@ -455,7 +547,7 @@ public partial class Form1 : Form
     {
         if (fillColorDialog.ShowDialog() == DialogResult.OK)
         {
-            _fillColor = fillColorDialog.Color;
+            // Create a ChangeFillColorOperation
         }
     }
 
@@ -615,6 +707,10 @@ public partial class Form1 : Form
     {
         _canvas.Undo();
         UpdateAllButtonStates();
+        foreach (var figure in _canvas.Figures)
+        {
+            figure.IsSelected = false;
+        }
         RenderFigures();
     }
 
@@ -622,7 +718,11 @@ public partial class Form1 : Form
     {
         _canvas.Redo();
         UpdateAllButtonStates();
-        _canvas.Render(_g, pictureBox1);
+        foreach (var figure in _canvas.Figures)
+        {
+            figure.IsSelected = false;
+        }
+        RenderFigures();
     }
     
     private void UndoCustomFigureButton_Click(object sender, EventArgs e)
@@ -682,14 +782,14 @@ public partial class Form1 : Form
     {
         // Create a translation operation for each selected figure
         var operations = _canvas.Figures.Where(f => f.IsSelected)
-            .Select(figure => new TranslateFigureOperation(figure, dx, dy)).Cast<CanvasOperation>().ToList();
+            .Select(figure => new TranslateFigureOperation(figure, dx, dy) {IsNewOperation = true}).Cast<CanvasOperation>().ToList();
         
         // Execute the batch operation and push it to the undo stack
         var batchOperation = new BatchCanvasOperation(operations);
         batchOperation.Execute(_canvas);
         _canvas.UndoStack.Push(batchOperation);
 
-        // Render the canvas
-        _canvas.Render(_g, pictureBox1);
+        // Render the figures
+        RenderFigures();
     }
 }

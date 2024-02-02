@@ -17,6 +17,7 @@ internal sealed class Canvas
     
     private int _squareCounter;
     private int _triangleCounter;
+    private int _customFigureCounter;
     
     public event Action<Figure>? FigureAdded;
     public event Action<Figure>? FigureRemoved;
@@ -27,7 +28,7 @@ internal sealed class Canvas
         {
             "Square" => $"Square {_squareCounter++}",
             "Triangle" => $"Triangle {_triangleCounter++}",
-            "Custom" => $"Custom {_squareCounter++}",
+            "Custom" => $"Custom {_customFigureCounter++}",
             _ => throw new InvalidOperationException("Unsupported figure type.")
         };
     }
@@ -35,6 +36,12 @@ internal sealed class Canvas
     public void AddFigure(Figure figure, bool isNewOperation = true)
     {
         Figures.Add(figure);
+        
+        if (figure is UnfinishedCustomFigure)
+        {
+            return;
+        }
+        
         OnFigureAdded(figure);
 
         // Clear the redo stack only if it's a new operation
@@ -42,11 +49,6 @@ internal sealed class Canvas
         {
             RedoStack.Clear();
         }
-    }
-
-    private void OnFigureAdded(Figure obj)
-    {
-        FigureAdded?.Invoke(obj);
     }
     
     public void RemoveFigure(Figure figure, bool isNewOperation = true)
@@ -60,14 +62,50 @@ internal sealed class Canvas
             RedoStack.Clear();
         }
     }
-
-    private void OnFigureRemoved(Figure obj)
+    
+    public void RotateFigure(Figure figure, double angle, bool isNewOperation = true)
     {
-        FigureRemoved?.Invoke(obj);
+        figure.Rotate(angle);
+        
+        // Clear the redo stack only if it's a new operation
+        if (isNewOperation)
+        {
+            RedoStack.Clear();
+        }
     }
     
-    public void AddCustomFigurePoint(PointF point, bool isNewOperation = true)
+    public void TranslateFigure(Figure figure, double dx, double dy, bool isNewOperation = true)
     {
+        figure.Translate(dx, dy);
+        
+        // Clear the redo stack only if it's a new operation
+        if (isNewOperation)
+        {
+            RedoStack.Clear();
+        }
+    }
+    
+    public void ScaleFigure(Figure figure, double sx, double sy, bool isNewOperation = true)
+    {
+        figure.Scale(sx, sy);
+        
+        // Clear the redo stack only if it's a new operation
+        if (isNewOperation)
+        {
+            RedoStack.Clear();
+        }
+    }
+    
+    public void AddUnfinishedCustomFigurePoint(UnfinishedCustomFigure figure, PointF point, bool isNewOperation = true)
+    {
+        // Check if it's the first point
+        if (CustomFigurePoints.Count == 0)
+        {
+            figure.RemoveLastPoint();
+        }
+        
+        figure.AddPoint(point);
+        
         CustomFigurePoints.Add(point);
         
         // Clear the redo stack only if it's a new operation
@@ -77,15 +115,49 @@ internal sealed class Canvas
         }
     }
     
-    public void RemoveCustomFigurePoint(PointF point, bool isNewOperation = true)
+    public void RemoveUnfinishedCustomFigurePoint(UnfinishedCustomFigure figure, bool isNewOperation = true)
     {
-        CustomFigurePoints.Remove(point);
+        figure.RemoveLastPoint();
+        
+        CustomFigurePoints.RemoveAt(CustomFigurePoints.Count - 1);
         
         // Clear the redo stack only if it's a new operation
         if (isNewOperation)
         {
             CustomFigureRedoStack.Clear();
         }
+    }
+    
+    public void ChangeFillColor(Figure figure, Color color, bool isNewOperation = true)
+    {
+        figure.FillColor = color;
+        
+        // Clear the redo stack only if it's a new operation
+        if (isNewOperation)
+        {
+            CustomFigureRedoStack.Clear();
+        }
+    }
+    
+    public void ChangeBorderColor(Figure figure, Color color, bool isNewOperation = true)
+    {
+        figure.BorderColor = color;
+        
+        // Clear the redo stack only if it's a new operation
+        if (isNewOperation)
+        {
+            CustomFigureRedoStack.Clear();
+        }
+    }
+    
+    private void OnFigureAdded(Figure obj)
+    {
+        FigureAdded?.Invoke(obj);
+    }
+
+    private void OnFigureRemoved(Figure obj)
+    {
+        FigureRemoved?.Invoke(obj);
     }
     
     public void Undo(bool isCustomFigureOperation = false)
@@ -96,6 +168,15 @@ internal sealed class Canvas
         if (!stack.TryPop(out var operation)) return;
 
         operation.IsNewOperation = false; // Mark the operation as not new
+        
+        // If batch operation, mark all operations as not new
+        if (operation is BatchCanvasOperation batchOperation)
+        {
+            foreach (var op in batchOperation.Operations)
+            {
+                op.IsNewOperation = false;
+            }
+        }
 
         operation.Undo(this); // Perform the undo operation
 
@@ -131,8 +212,6 @@ internal sealed class Canvas
         g.Clear(Color.Black);
         
         // Draw all figures
-        Figures.ForEach(f => f.Draw(g));
-        
         foreach (var figure in Figures)
         {
             figure.Draw(g);
