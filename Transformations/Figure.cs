@@ -10,7 +10,7 @@ public abstract class Figure
     public Color BorderColor { get; set; } = Color.White;
     public Color FillColor { get; set; } = Color.FromArgb(128, Color.White);
     public bool IsSelected { get; set; }
-
+    
     protected Figure(PointF[] points, PointF position, PointF pivotOffset, string name)
     {
         Name = name;
@@ -82,12 +82,12 @@ public abstract class Figure
     }
 
     // Method to get the selection points
-    public IEnumerable<PointF> GetSelectionPoints()
+    private IEnumerable<PointF> GetSelectionPoints()
     {
         var bounds = GetBounds();
 
-        return new[]
-        {
+        return
+        [
             new PointF(bounds.Left, bounds.Top), // Top-left corner
             new PointF(bounds.Right, bounds.Top), // Top-right corner
             new PointF(bounds.Right, bounds.Bottom), // Bottom-right corner
@@ -96,10 +96,14 @@ public abstract class Figure
             new PointF(bounds.Right, bounds.Top + bounds.Height / 2), // Right side
             new PointF(bounds.Left + bounds.Width / 2, bounds.Bottom), // Bottom side
             new PointF(bounds.Left, bounds.Top + bounds.Height / 2) // Left side
-        };
+        ];
+    }
+    
+    public Figure Clone()
+    {
+        return (Figure)MemberwiseClone();
     }
 
-    // Method to draw the figure
     public virtual void Draw(Graphics g)
     {
         // Draw the figure with the specified border and fill colors
@@ -112,6 +116,20 @@ public abstract class Figure
         const float pivotSize = 5; // Size of the pivot circle
         using var pivotPen = new Pen(Color.Red);
         g.DrawEllipse(pivotPen, _pivot.X - pivotSize / 2, _pivot.Y - pivotSize / 2, pivotSize, pivotSize);
+        
+        // Draw the selection points and the selection rectangle
+        if (!IsSelected) return;
+        var bounds = GetBounds();
+        var pen = new Pen(Color.White) { DashStyle = DashStyle.Dash };
+        g.DrawRectangle(pen, bounds);
+
+        var points = GetSelectionPoints();
+        foreach (var point in points)
+        {
+            // Draw the selection points as small rectangles
+            g.FillRectangle(Brushes.White, point.X - 4, point.Y - 4, 8, 8);
+        }
+        
     }
 }
 
