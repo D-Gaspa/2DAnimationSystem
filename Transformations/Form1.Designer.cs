@@ -471,6 +471,7 @@
             Controls.Add(redoButton);
             Controls.Add(figuresCheckedListBox);
             Controls.Add(pictureBox1);
+            DoubleBuffered = true;
             ForeColor = SystemColors.Control;
             Name = "Form1";
             Text = "Form1";

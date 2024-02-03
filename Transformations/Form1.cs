@@ -12,6 +12,8 @@ public partial class Form1 : Form
     private bool _isAddFigureModeActive;
     private bool _isAddCustomFigureModeActive;
     private bool _isDragging;
+    private bool _isTranslating;
+    private bool _isResizing;
     private Point _initialMousePosition;
     private Point _currentMousePosition;
     private List<Figure>? _tempSelectedFigures;
@@ -160,9 +162,8 @@ public partial class Form1 : Form
     
     private void PictureBox1_MouseMove(object? sender, MouseEventArgs e)
     {
-        // Update the coordinatesLabel text with the current mouse position
-        coordinatesLabel.Text = $@"Coordinates | X: {e.X}, Y: {e.Y} |";
-
+        UpdateCoordinatesLabel(e);
+        
         // Check if a figure is selected
         var selectedFigures = _canvas.Figures.Where(f => f.IsSelected).ToList();
         if (selectedFigures.Count == 0)
@@ -173,38 +174,70 @@ public partial class Form1 : Form
         
         if (_isDragging)
         {
-            // Calculate the translation vector
-            var dx = e.X - _currentMousePosition.X;
-            var dy = e.Y - _currentMousePosition.Y;
-
-            // Translate each temporary figure
-            if (_tempSelectedFigures == null) return;
-            foreach (var figure in _tempSelectedFigures)
-            {
-                figure.Translate(dx, dy);
-            }
-
-            // Update the current mouse position
-            _currentMousePosition = e.Location;
-
-            // Render the canvas
-            Canvas.Render(_g, pictureBox1);
-            
-            // Render the temporary figures
-            foreach (var figure in _tempSelectedFigures)
-            {
-                figure.Draw(_g);
-            }
-            
-            // Render all figures that are not selected (in the background)
-            foreach (var figure in _canvas.Figures.Where(f => !f.IsSelected))
-            {
-                figure.Draw(_g);
-            }
-
+            HandleDragging(e);
             return;
         }
+        
+        HandleCursorChange(selectedFigures, e);
+    }
+    
+    private void UpdateCoordinatesLabel(MouseEventArgs e)
+    {
+        coordinatesLabel.Text = $@"X: {e.X}, Y: {e.Y}";
+    }
+    
+    private void HandleDragging(MouseEventArgs e)
+    {
+        if (_isTranslating)
+        {
+            HandleTranslationDragging(e);
+        }
 
+        if (_isResizing)
+        {
+            HandleResizeDragging(e);
+        }
+    }
+    
+    private void HandleTranslationDragging(MouseEventArgs e)
+    {
+        // Calculate the translation vector
+        var dx = e.X - _currentMousePosition.X;
+        var dy = e.Y - _currentMousePosition.Y;
+
+        // Translate each temporary figure
+        if (_tempSelectedFigures == null) return;
+        foreach (var figure in _tempSelectedFigures)
+        {
+            figure.Translate(dx, dy);
+        }
+
+        // Update the current mouse position
+        _currentMousePosition = e.Location;
+
+        // Render the canvas
+        Canvas.Render(_g, pictureBox1);
+            
+        // Render the temporary figures
+        foreach (var figure in _tempSelectedFigures)
+        {
+            figure.Draw(_g);
+        }
+            
+        // Render all figures that are not selected (in the background)
+        foreach (var figure in _canvas.Figures.Where(f => !f.IsSelected))
+        {
+            figure.Draw(_g);
+        }
+    }
+    
+    private void HandleResizeDragging(MouseEventArgs e)
+    {
+        throw new NotImplementedException();
+    }
+    
+    private void HandleCursorChange(IEnumerable<Figure> selectedFigures, MouseEventArgs e)
+    {
         foreach (var bounds in selectedFigures.Select(selectedFigure => selectedFigure.GetBounds()))
         {
             // Check if the cursor is inside the selection rectangle
@@ -226,7 +259,7 @@ public partial class Form1 : Form
             pictureBox1.Cursor = GetCursorForSide(bounds, e.Location);
             return;
         }
-
+        
         pictureBox1.Cursor = Cursors.Default;
     }
     
@@ -379,6 +412,9 @@ public partial class Form1 : Form
         
         // Render the figures
         RenderFigures();
+        
+        // Update the button states
+        UpdateAllButtonStates();
     }
     
     private void HandleFigureSelection(MouseEventArgs e)
@@ -420,7 +456,7 @@ public partial class Form1 : Form
     
     private void PictureBox1_MouseDown(object? sender, MouseEventArgs e)
     {
-        if (pictureBox1.Cursor != Cursors.SizeAll || !_canvas.Figures.Any(f => f.IsSelected)) 
+        if (pictureBox1.Cursor == Cursors.Default || !_canvas.Figures.Any(f => f.IsSelected)) 
             return;
         _isDragging = true;
         _initialMousePosition = e.Location;
@@ -428,11 +464,17 @@ public partial class Form1 : Form
         
         // Create a temporary list of selected figures
         _tempSelectedFigures = _canvas.Figures.Where(f => f.IsSelected).Select(f => f.Clone()).ToList();
+        
+        if (pictureBox1.Cursor == Cursors.SizeAll)
+        {
+            _isTranslating = true;
+        }
     }
     
     private void PictureBox1_MouseUp(object? sender, MouseEventArgs e)
     {
         _isDragging = false;
+        _isTranslating = false;
         
         // If the temporary list of selected figures is null, return
         if (_tempSelectedFigures == null) return;
