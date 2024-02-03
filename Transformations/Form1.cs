@@ -11,6 +11,10 @@ public partial class Form1 : Form
     private Color _fillColor;
     private bool _isAddFigureModeActive;
     private bool _isAddCustomFigureModeActive;
+    private bool _isDragging;
+    private Point _initialMousePosition;
+    private Point _currentMousePosition;
+    private List<Figure>? _tempSelectedFigures;
     
     public Form1()
     {
@@ -31,7 +35,7 @@ public partial class Form1 : Form
         UpdateAllButtonStates();
 
         // Render the canvas.
-        _canvas.Render(_g, pictureBox1);
+        Canvas.Render(_g, pictureBox1);
     }
 
     private void SubscribeToEvents()
@@ -41,6 +45,8 @@ public partial class Form1 : Form
         figuresCheckedListBox.ItemCheck += FiguresCheckedListBox_ItemCheck;
         pictureBox1.MouseMove += PictureBox1_MouseMove;
         pictureBox1.MouseClick += PictureBox1_MouseClick;
+        pictureBox1.MouseUp += PictureBox1_MouseUp;
+        pictureBox1.MouseDown += PictureBox1_MouseDown;
         addCustomFigureCheckBox.CheckedChanged += AddCustomFigureCheckBox_CheckedChanged;
         addCustomFigureButton.Click += AddCustomFigureButton_Click;
         resetCustomFigureButton.Click += ResetCustomFigureButton_Click;
@@ -70,7 +76,8 @@ public partial class Form1 : Form
     
     private void RenderFigures()
     {
-        _canvas.Render(_g, pictureBox1);
+        Canvas.Render(_g, pictureBox1);
+        _canvas.RenderFigures(_g);
     }
     
     private void AddCustomFigureCheckBox_CheckedChanged(object? sender, EventArgs e)
@@ -139,7 +146,7 @@ public partial class Form1 : Form
         figure.IsSelected = e.NewValue == CheckState.Checked;
 
         // Render the canvas
-        _canvas.Render(_g, pictureBox1);
+        RenderFigures();
     }
     
     private void UpdateSelectAllCheckBox()
@@ -161,6 +168,40 @@ public partial class Form1 : Form
         if (selectedFigures.Count == 0)
         {
             pictureBox1.Cursor = Cursors.Default;
+            return;
+        }
+        
+        if (_isDragging)
+        {
+            // Calculate the translation vector
+            var dx = e.X - _currentMousePosition.X;
+            var dy = e.Y - _currentMousePosition.Y;
+
+            // Translate each temporary figure
+            if (_tempSelectedFigures == null) return;
+            foreach (var figure in _tempSelectedFigures)
+            {
+                figure.Translate(dx, dy);
+            }
+
+            // Update the current mouse position
+            _currentMousePosition = e.Location;
+
+            // Render the canvas
+            Canvas.Render(_g, pictureBox1);
+            
+            // Render the temporary figures
+            foreach (var figure in _tempSelectedFigures)
+            {
+                figure.Draw(_g);
+            }
+            
+            // Render all figures that are not selected (in the background)
+            foreach (var figure in _canvas.Figures.Where(f => !f.IsSelected))
+            {
+                figure.Draw(_g);
+            }
+
             return;
         }
 
@@ -260,25 +301,88 @@ public partial class Form1 : Form
     {
         if (_isAddCustomFigureModeActive)
         {
-            if (_canvas.CustomFigurePoints.Count == 0)
-            {
-                // Create a new UnfinishedCustomFigure and add it to the canvas with the first point
-                _unfinishedCustomFigure = new UnfinishedCustomFigure([e.Location], "Custom");
-                _canvas.AddFigure(_unfinishedCustomFigure);
-            }
-
-            // Add the point to the unfinishedCustomFigure
-            var addPointOperation = new AddUnfinishedCustomFigurePointOperation(_unfinishedCustomFigure, e.Location)
-            {
-                IsNewOperation = true
-            };
-            addPointOperation.Execute(_canvas);
-            _canvas.CustomFigureUndoStack.Push(addPointOperation);
-
-            // Redraw the custom figure.
-            RedrawCustomFigure();
+            HandleCustomFigureCreationOnClick(e);
             return;
         }
+        if (_isDragging)
+        {
+            HandleFigureDraggingOnClick(e);
+            return;
+        }
+        HandleFigureSelection(e);
+    }
+    
+    private void HandleCustomFigureCreationOnClick(MouseEventArgs e)
+    {
+        if (_canvas.CustomFigurePoints.Count == 0)
+        {
+            // Create a new UnfinishedCustomFigure and add it to the canvas with the first point
+            _unfinishedCustomFigure = new UnfinishedCustomFigure([e.Location], "Custom");
+            _canvas.AddFigure(_unfinishedCustomFigure);
+        }
+
+        // Add the point to the unfinishedCustomFigure
+        var addPointOperation = new AddUnfinishedCustomFigurePointOperation(_unfinishedCustomFigure, e.Location)
+        {
+            IsNewOperation = true
+        };
+        addPointOperation.Execute(_canvas);
+        _canvas.CustomFigureUndoStack.Push(addPointOperation);
+
+        // Redraw the custom figure.
+        RedrawCustomFigure();
+    }
+    
+    private void RedrawCustomFigure()
+    {
+        // If the addCustomFigureCheckBox is not checked return.
+        if (!_isAddCustomFigureModeActive) return;
+
+        // Clear the canvas and re-render the figures.
+        _g.Clear(Color.Transparent);
+        
+        // Render the figures
+        RenderFigures();
+
+        // Update the button states and refresh the picture box.
+        UpdateCustomFigureButtonStates();
+        pictureBox1.Refresh();
+    }
+    
+    private void HandleFigureDraggingOnClick(MouseEventArgs e)
+    {
+        if (pictureBox1.Cursor == Cursors.SizeAll)
+        {
+            TranslateSelectedFigures(e);
+        }
+        
+    }
+    
+    private void TranslateSelectedFigures(MouseEventArgs e)
+    {
+        // Calculate the translation vector
+        var dx = e.X - _initialMousePosition.X;
+        var dy = e.Y - _initialMousePosition.Y;
+
+        // Create a translation operation for each selected figure
+        var operations = _canvas.Figures.Where(f => f.IsSelected)
+            .Select(figure => new TranslateFigureOperation(figure, dx, dy) { IsNewOperation = true })
+            .Cast<CanvasOperation>().ToList();
+
+        // Execute the batch operation and push it to the undo stack
+        var batchOperation = new BatchCanvasOperation(operations);
+        batchOperation.Execute(_canvas);
+        _canvas.UndoStack.Push(batchOperation);
+
+        // Update the initial mouse position
+        _initialMousePosition = e.Location;
+        
+        // Render the figures
+        RenderFigures();
+    }
+    
+    private void HandleFigureSelection(MouseEventArgs e)
+    {
         // Check if a figure is clicked
         var clickedFigure = _canvas.Figures.FirstOrDefault(f => f.IsInsideFigure(e.Location));
         if (clickedFigure == null)
@@ -302,22 +406,6 @@ public partial class Form1 : Form
         RenderFigures();
     }
     
-    private void RedrawCustomFigure()
-    {
-        // If the addCustomFigureCheckBox is not checked return.
-        if (!_isAddCustomFigureModeActive) return;
-
-        // Clear the canvas and re-render the figures.
-        _g.Clear(Color.Transparent);
-        
-        // Render the figures
-        RenderFigures();
-
-        // Update the button states and refresh the picture box.
-        UpdateCustomFigureButtonStates();
-        pictureBox1.Refresh();
-    }
-    
     private void SetFigureSelection(Figure figure, bool isSelected)
     {
         figure.IsSelected = isSelected;
@@ -328,6 +416,28 @@ public partial class Form1 : Form
         {
             figuresCheckedListBox.SetItemChecked(index, isSelected);
         }
+    }
+    
+    private void PictureBox1_MouseDown(object? sender, MouseEventArgs e)
+    {
+        if (pictureBox1.Cursor != Cursors.SizeAll || !_canvas.Figures.Any(f => f.IsSelected)) 
+            return;
+        _isDragging = true;
+        _initialMousePosition = e.Location;
+        _currentMousePosition = e.Location;
+        
+        // Create a temporary list of selected figures
+        _tempSelectedFigures = _canvas.Figures.Where(f => f.IsSelected).Select(f => f.Clone()).ToList();
+    }
+    
+    private void PictureBox1_MouseUp(object? sender, MouseEventArgs e)
+    {
+        _isDragging = false;
+        
+        // If the temporary list of selected figures is null, return
+        if (_tempSelectedFigures == null) return;
+        _tempSelectedFigures.Clear();
+        _tempSelectedFigures = null;
     }
     
     private void AddCustomFigureButton_Click(object? sender, EventArgs e)
@@ -421,7 +531,7 @@ public partial class Form1 : Form
 
     private void OnFigureAdded(Figure figure)
     {
-        AddFigureToCheckList(figure.Name);
+        AddFigureToCheckedListBox(figure.Name);
     }
 
     private void OnFigureRemoved(Figure figure)
@@ -483,7 +593,7 @@ public partial class Form1 : Form
         }
 
         // Render the canvas
-        _canvas.Render(_g, pictureBox1);
+        RenderFigures();
     }
 
     private void customPivotCheckBox_CheckedChanged(object sender, EventArgs e)
@@ -573,7 +683,7 @@ public partial class Form1 : Form
 
         // Update the button states and render the canvas
         UpdateButtonStates();
-        _canvas.Render(_g, pictureBox1);
+        RenderFigures();
     }
 
     private bool ValidateFigureInputs(out double size, out PointF position, out PointF pivotOffset)
@@ -639,7 +749,7 @@ public partial class Form1 : Form
         };
     }
 
-    private void AddFigureToCheckList(string name)
+    private void AddFigureToCheckedListBox(string name)
     {
         figuresCheckedListBox.Items.Add(name, false); // Add to CheckedListBox and set as unchecked
     }
@@ -665,7 +775,7 @@ public partial class Form1 : Form
         _canvas.UndoStack.Push(batchOperation);
 
         // Render the canvas
-        _canvas.Render(_g, pictureBox1);
+        RenderFigures();
         UpdateButtonStates();
 
         // Check if all items are deleted and uncheck the selectAllCheckBox
@@ -762,23 +872,23 @@ public partial class Form1 : Form
                 }
                 break;
             case Keys.Left:
-                ApplyTranslationToSelectedFigures(-10, 0);
+                TranslateSelectedFigures(-10, 0);
                 break;
             case Keys.Right:
-                ApplyTranslationToSelectedFigures(10, 0);
+                TranslateSelectedFigures(10, 0);
                 break;
             case Keys.Up:
-                ApplyTranslationToSelectedFigures(0, -10);
+                TranslateSelectedFigures(0, -10);
                 break;
             case Keys.Down:
-                ApplyTranslationToSelectedFigures(0, 10);
+                TranslateSelectedFigures(0, 10);
                 break;
         }
 
         return base.ProcessCmdKey(ref msg, keyData);
     }
 
-    private void ApplyTranslationToSelectedFigures(int dx, int dy)
+    private void TranslateSelectedFigures(int dx, int dy)
     {
         // Create a translation operation for each selected figure
         var operations = _canvas.Figures.Where(f => f.IsSelected)

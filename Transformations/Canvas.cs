@@ -1,6 +1,4 @@
-﻿using System.Drawing.Drawing2D;
-
-namespace Transformations;
+﻿namespace Transformations;
 internal sealed class Canvas
 {
     public readonly List<Figure> Figures = [];
@@ -206,31 +204,20 @@ internal sealed class Canvas
         RedoStack.Clear();
     }
     
-    public void Render(Graphics g, PictureBox pictureBox)
+    public static void Render(Graphics g, PictureBox pictureBox)
     {
         // Clear the canvas
         g.Clear(Color.Black);
         
-        // Draw all figures
+        // Invalidate the picture box to redraw it
+        pictureBox.Invalidate();
+    }
+    
+    public void RenderFigures(Graphics g)
+    {
         foreach (var figure in Figures)
         {
             figure.Draw(g);
-
-            // Draw the selection points and the selection rectangle
-            if (!figure.IsSelected) continue;
-            var bounds = figure.GetBounds();
-            var pen = new Pen(Color.White) { DashStyle = DashStyle.Dash };
-            g.DrawRectangle(pen, bounds);
-
-            var points = figure.GetSelectionPoints();
-            foreach (var point in points)
-            {
-                // Draw the selection points as small rectangles
-                g.FillRectangle(Brushes.White, point.X - 4, point.Y - 4, 8, 8);
-            }
         }
-
-        // Invalidate the picture box to redraw it
-        pictureBox.Invalidate();
     }
 }
