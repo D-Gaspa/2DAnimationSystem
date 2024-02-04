@@ -17,6 +17,7 @@ public partial class Form1 : Form
     private Point _initialMousePosition;
     private Point _currentMousePosition;
     private List<Figure>? _tempSelectedFigures;
+    private ResizePosition _currentResizePosition;
     
     public Form1()
     {
@@ -233,7 +234,30 @@ public partial class Form1 : Form
     
     private void HandleResizeDragging(MouseEventArgs e)
     {
-        throw new NotImplementedException();
+        // Create a resize operation for each selected figure
+        if (_tempSelectedFigures == null) return;
+        var operations = _tempSelectedFigures.Where(f => f.IsSelected)
+            .Select(figure => new ResizeFigureOperation(figure, _currentResizePosition, e.Location) { IsNewOperation = false })
+            .Cast<CanvasOperation>().ToList();
+        
+        // Execute the batch operation
+        var batchOperation = new BatchCanvasOperation(operations);
+        batchOperation.Execute(_canvas);
+        
+        // Render the canvas
+        Canvas.Render(_g, pictureBox1);
+        
+        // Render the temporary figures
+        foreach (var figure in _tempSelectedFigures)
+        {
+            figure.Draw(_g);
+        }
+        
+        // Render all figures that are not selected (in the background)
+        foreach (var figure in _canvas.Figures.Where(f => !f.IsSelected))
+        {
+            figure.Draw(_g);
+        }
     }
     
     private void HandleCursorChange(IEnumerable<Figure> selectedFigures, MouseEventArgs e)
@@ -280,25 +304,35 @@ public partial class Form1 : Form
         return corners.Any(corner => Math.Abs(corner.X - point.X) <= tolerance && Math.Abs(corner.Y - point.Y) <= tolerance);
     }
 
-    private static Cursor GetCursorForCorner(RectangleF bounds, PointF point)
+    private Cursor GetCursorForCorner(RectangleF bounds, PointF point)
     {
         // Define a tolerance for how close the cursor needs to be to a corner
         const float tolerance = 10;
 
         // Check each corner
-        if (Math.Abs(bounds.Left - point.X) <= tolerance && Math.Abs(bounds.Top - point.Y) <= tolerance ||
-            Math.Abs(bounds.Right - point.X) <= tolerance && Math.Abs(bounds.Bottom - point.Y) <= tolerance)
+        if (Math.Abs(bounds.Left - point.X) <= tolerance && Math.Abs(bounds.Top - point.Y) <= tolerance)
         {
+            _currentResizePosition = ResizePosition.TopLeft;
             return Cursors.SizeNWSE;
         }
 
-        if (Math.Abs(bounds.Right - point.X) <= tolerance && Math.Abs(bounds.Top - point.Y) <= tolerance ||
-            Math.Abs(bounds.Left - point.X) <= tolerance && Math.Abs(bounds.Bottom - point.Y) <= tolerance)
+        if (Math.Abs(bounds.Right - point.X) <= tolerance && Math.Abs(bounds.Bottom - point.Y) <= tolerance)
         {
+            _currentResizePosition = ResizePosition.BottomRight;
+            return Cursors.SizeNWSE;
+        }
+
+        if (Math.Abs(bounds.Right - point.X) <= tolerance && Math.Abs(bounds.Top - point.Y) <= tolerance)
+        {
+            _currentResizePosition = ResizePosition.TopRight;
             return Cursors.SizeNESW;
         }
 
-        return Cursors.Default;
+        if (!(Math.Abs(bounds.Left - point.X) <= tolerance) || !(Math.Abs(bounds.Bottom - point.Y) <= tolerance))
+            return Cursors.Default;
+        _currentResizePosition = ResizePosition.BottomLeft;
+        return Cursors.SizeNESW;
+
     }
 
     private static bool IsCursorAtSide(RectangleF bounds, PointF point)
@@ -307,27 +341,40 @@ public partial class Form1 : Form
         const float tolerance = 10;
 
         // Check each side
-        return Math.Abs(bounds.Left - point.X) <= tolerance || Math.Abs(bounds.Right - point.X) <= tolerance ||
-               Math.Abs(bounds.Top - point.Y) <= tolerance || Math.Abs(bounds.Bottom - point.Y) <= tolerance;
+        return (Math.Abs(bounds.Left - point.X) <= tolerance && point.Y >= bounds.Top && point.Y <= bounds.Bottom) ||
+               (Math.Abs(bounds.Right - point.X) <= tolerance && point.Y >= bounds.Top && point.Y <= bounds.Bottom) ||
+               (Math.Abs(bounds.Top - point.Y) <= tolerance && point.X >= bounds.Left && point.X <= bounds.Right) ||
+               (Math.Abs(bounds.Bottom - point.Y) <= tolerance && point.X >= bounds.Left && point.X <= bounds.Right);
     }
 
-    private static Cursor GetCursorForSide(RectangleF bounds, PointF point)
+    private Cursor GetCursorForSide(RectangleF bounds, PointF point)
     {
         // Define a tolerance for how close the cursor needs to be to a side
         const float tolerance = 10;
 
         // Check each side
-        if (Math.Abs(bounds.Left - point.X) <= tolerance || Math.Abs(bounds.Right - point.X) <= tolerance)
+        if (Math.Abs(bounds.Left - point.X) <= tolerance)
         {
+            _currentResizePosition = ResizePosition.LeftMiddle;
             return Cursors.SizeWE;
         }
 
-        if (Math.Abs(bounds.Top - point.Y) <= tolerance || Math.Abs(bounds.Bottom - point.Y) <= tolerance)
+        if (Math.Abs(bounds.Right - point.X) <= tolerance)
         {
+            _currentResizePosition = ResizePosition.RightMiddle;
+            return Cursors.SizeWE;
+        }
+
+        if (Math.Abs(bounds.Top - point.Y) <= tolerance)
+        {
+            _currentResizePosition = ResizePosition.TopMiddle;
             return Cursors.SizeNS;
         }
 
-        return Cursors.Default;
+        if (!(Math.Abs(bounds.Bottom - point.Y) <= tolerance)) return Cursors.Default;
+        _currentResizePosition = ResizePosition.BottomMiddle;
+        return Cursors.SizeNS;
+
     }
     
     private void PictureBox1_MouseClick(object? sender, MouseEventArgs e)
@@ -342,6 +389,7 @@ public partial class Form1 : Form
             HandleFigureDraggingOnClick(e);
             return;
         }
+        
         HandleFigureSelection(e);
     }
     
@@ -351,7 +399,8 @@ public partial class Form1 : Form
         {
             // Create a new UnfinishedCustomFigure and add it to the canvas with the first point
             _unfinishedCustomFigure = new UnfinishedCustomFigure([e.Location], "Custom");
-            _canvas.AddFigure(_unfinishedCustomFigure);
+            var addFigureOperation = new AddFigureOperation(_unfinishedCustomFigure);
+            addFigureOperation.Execute(_canvas);
         }
 
         // Add the point to the unfinishedCustomFigure
@@ -388,7 +437,11 @@ public partial class Form1 : Form
         {
             TranslateSelectedFigures(e);
         }
-        
+
+        else if (pictureBox1.Cursor != Cursors.Default)
+        {
+            ResizeSelectedFigures(e);
+        }
     }
     
     private void TranslateSelectedFigures(MouseEventArgs e)
@@ -407,6 +460,33 @@ public partial class Form1 : Form
         batchOperation.Execute(_canvas);
         _canvas.UndoStack.Push(batchOperation);
 
+        // Move translated figures to the end of the list
+        var translatedFigures = _canvas.Figures.Where(f => f.IsSelected).ToList();
+        foreach (var figure in translatedFigures)
+        {
+            _canvas.Figures.Remove(figure);
+            _canvas.Figures.Add(figure);
+        }
+        
+        // Render the figures
+        RenderFigures();
+        
+        // Update the button states
+        UpdateAllButtonStates();
+    }
+    
+    private void ResizeSelectedFigures(MouseEventArgs e)
+    {
+        // Create a resize operation for each selected figure
+        var operations = _canvas.Figures.Where(f => f.IsSelected)
+            .Select(figure => new ResizeFigureOperation(figure, _currentResizePosition, e.Location) { IsNewOperation = true })
+            .Cast<CanvasOperation>().ToList();
+        
+        // Execute the batch operation and push it to the undo stack
+        var batchOperation = new BatchCanvasOperation(operations);
+        batchOperation.Execute(_canvas);
+        _canvas.UndoStack.Push(batchOperation);
+        
         // Update the initial mouse position
         _initialMousePosition = e.Location;
         
@@ -456,18 +536,42 @@ public partial class Form1 : Form
     
     private void PictureBox1_MouseDown(object? sender, MouseEventArgs e)
     {
-        if (pictureBox1.Cursor == Cursors.Default || !_canvas.Figures.Any(f => f.IsSelected)) 
+        if (pictureBox1.Cursor == Cursors.Default || !_canvas.Figures.Any(f => f.IsSelected))
             return;
         _isDragging = true;
         _initialMousePosition = e.Location;
         _currentMousePosition = e.Location;
-        
-        // Create a temporary list of selected figures
-        _tempSelectedFigures = _canvas.Figures.Where(f => f.IsSelected).Select(f => f.Clone()).ToList();
-        
+
         if (pictureBox1.Cursor == Cursors.SizeAll)
         {
             _isTranslating = true;
+            
+            // Create a temporary list of selected figures
+            _tempSelectedFigures = _canvas.Figures.Where(f => f.IsSelected).Select(f => f.Clone()).ToList();
+            
+            return;
+        }
+
+        var isResizeCursor = pictureBox1.Cursor == Cursors.SizeWE || pictureBox1.Cursor == Cursors.SizeNS ||
+                             pictureBox1.Cursor == Cursors.SizeNWSE || pictureBox1.Cursor == Cursors.SizeNESW;
+
+        if (!isResizeCursor) return;
+        {
+            // If a resize operation is about to be performed, deselect all other figures and select the figure to be resized where the mouse is clicked.
+            var figureToResize = _canvas.Figures.FirstOrDefault(f => IsCursorAtSide(f.GetBounds(), e.Location));
+            if (figureToResize != null)
+            {
+                foreach (var figure in _canvas.Figures)
+                {
+                    figure.IsSelected = false;
+                }
+                figureToResize.IsSelected = true;
+            }
+
+            // Create a temporary list of selected figures
+            _tempSelectedFigures = _canvas.Figures.Where(f => f.IsSelected).Select(f => f.Clone()).ToList();
+
+            _isResizing = true;
         }
     }
     
@@ -475,6 +579,7 @@ public partial class Form1 : Form
     {
         _isDragging = false;
         _isTranslating = false;
+        _isResizing = false;
         
         // If the temporary list of selected figures is null, return
         if (_tempSelectedFigures == null) return;
@@ -537,11 +642,11 @@ public partial class Form1 : Form
         // Clear custom figure stacks
         _canvas.CustomFigureUndoStack.Clear();
         _canvas.CustomFigureRedoStack.Clear();
-        
+
+        // Remove the unfinished custom figure from the canvas
+        _canvas.Figures.Remove(_unfinishedCustomFigure);
         _unfinishedCustomFigure = null!;
-        
-        _canvas.Reset();
-        
+
         // Update the button states
         UpdateCustomFigureButtonStates();
         
@@ -563,10 +668,11 @@ public partial class Form1 : Form
         // Clear the custom figure stacks.
         _canvas.CustomFigureUndoStack.Clear();
         _canvas.CustomFigureRedoStack.Clear();
-        
-        _unfinishedCustomFigure = null!;
-        _canvas.Reset();
 
+        // Remove the unfinished custom figure from the canvas
+        _canvas.Figures.Remove(_unfinishedCustomFigure);
+        _unfinishedCustomFigure = null!;
+        
         // Render the figures
         RenderFigures();
     }
@@ -839,6 +945,8 @@ public partial class Form1 : Form
         UpdateButtonState(undoCustomFigureButton, _canvas.CanCustomFigureUndo(), Color.Green, DefaultBackColor);
         UpdateButtonState(addCustomFigureButton, _canvas.CustomFigurePoints.Count >= 3, Color.MidnightBlue, DefaultBackColor);
         UpdateButtonState(resetCustomFigureButton, _canvas.CustomFigurePoints.Count > 0, Color.DarkGreen, DefaultBackColor);
+        UpdateButtonState(borderColorCustomFigureButton, _canvas.CustomFigurePoints.Count > 1, Color.SteelBlue, DefaultBackColor);
+        UpdateButtonState(fillColorCustomFigureButton, _canvas.CustomFigurePoints.Count > 2, Color.SteelBlue, DefaultBackColor);
     }
 
     private void UpdateButtonStates()
@@ -924,6 +1032,54 @@ public partial class Form1 : Form
                 break;
             case Keys.Down:
                 TranslateSelectedFigures(0, 10);
+                break;
+            case Keys.Back:
+                if (deleteButton.Enabled)
+                {
+                    DeleteButton_Click(this, EventArgs.Empty);
+                }
+                break;
+            case Keys.Control | Keys.Z:
+                if (undoButton.Enabled && !_isAddCustomFigureModeActive)
+                {
+                    UndoButton_Click(this, EventArgs.Empty);
+                }
+                if (undoCustomFigureButton.Enabled && _isAddCustomFigureModeActive)
+                {
+                    UndoCustomFigureButton_Click(this, EventArgs.Empty);
+                }
+                break;
+            case Keys.Control | Keys.Y:
+                if (redoButton.Enabled && !_isAddCustomFigureModeActive)
+                {
+                    RedoButton_Click(this, EventArgs.Empty);
+                }
+                if (redoCustomFigureButton.Enabled && _isAddCustomFigureModeActive)
+                {
+                    RedoCustomFigureButton_Click(this, EventArgs.Empty);
+                }
+                break;
+            case Keys.Control | Keys.Shift | Keys.Z:
+                if (redoButton.Enabled && !_isAddCustomFigureModeActive)
+                {
+                    RedoButton_Click(this, EventArgs.Empty);
+                }
+                if (redoCustomFigureButton.Enabled && _isAddCustomFigureModeActive)
+                {
+                    RedoCustomFigureButton_Click(this, EventArgs.Empty);
+                }
+                break;
+            case Keys.Control | Keys.A:
+                if (!_isAddCustomFigureModeActive)
+                {
+                    selectAllCheckBox.Checked = true;
+                }
+                break;
+            case Keys.Control | Keys.Shift | Keys.A:
+                if (!_isAddCustomFigureModeActive)
+                {
+                    selectAllCheckBox.Checked = false;
+                }
                 break;
         }
 

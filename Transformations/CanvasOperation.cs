@@ -1,5 +1,17 @@
 ﻿namespace Transformations;
 
+public enum ResizePosition
+{
+    TopMiddle,
+    BottomMiddle,
+    RightMiddle,
+    LeftMiddle,
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight
+}
+
 internal abstract class CanvasOperation
 {
     public abstract void Execute(Canvas canvas);
@@ -32,12 +44,29 @@ internal class AddFigureOperation(Figure figure) : CanvasOperation
 {
     public override void Execute(Canvas canvas)
     {
-        canvas.AddFigure(figure, IsNewOperation);
+        canvas.Figures.Add(figure);
+        
+        if (figure is UnfinishedCustomFigure)
+        {
+            return;
+        }
+        
+        canvas.OnFigureAdded(figure);
+
+        // Clear the redo stack only if it's a new operation
+        if (IsNewOperation)
+        {
+            canvas.RedoStack.Clear();
+        }
     }
 
     public override void Undo(Canvas canvas)
     {
-        canvas.RemoveFigure(figure, IsNewOperation);
+        var operation = new DeleteFigureOperation(figure)
+        {
+            IsNewOperation = IsNewOperation
+        };
+        operation.Execute(canvas);
     }
 }
 
@@ -45,12 +74,23 @@ internal class DeleteFigureOperation(Figure figure) : CanvasOperation
 {
     public override void Execute(Canvas canvas)
     {
-        canvas.RemoveFigure(figure, IsNewOperation);
+        canvas.Figures.Remove(figure);
+        canvas.OnFigureRemoved(figure);
+        
+        // Clear the redo stack only if it's a new operation
+        if (IsNewOperation)
+        {
+            canvas.RedoStack.Clear();
+        }
     }
 
     public override void Undo(Canvas canvas)
     {
-        canvas.AddFigure(figure, IsNewOperation);
+        var operation = new AddFigureOperation(figure)
+        {
+            IsNewOperation = IsNewOperation
+        };
+        operation.Execute(canvas);
     }
 }
 
@@ -63,12 +103,22 @@ internal class RotateFigureOperation(Figure figure, double angle) : TransformFig
 {
     public override void Execute(Canvas canvas)
     {
-        canvas.RotateFigure(Figure, angle, IsNewOperation);
+        Figure.Rotate(angle);
+        
+        // Clear the redo stack only if it's a new operation
+        if (IsNewOperation)
+        {
+            canvas.RedoStack.Clear();
+        }
     }
 
     public override void Undo(Canvas canvas)
     {
-        canvas.RotateFigure(Figure, -angle, IsNewOperation);
+        var operation = new RotateFigureOperation(Figure, -angle)
+        {
+            IsNewOperation = IsNewOperation
+        };
+        operation.Execute(canvas);
     }
 }
 
@@ -76,25 +126,22 @@ internal class TranslateFigureOperation(Figure figure, double dx, double dy) : T
 {
     public override void Execute(Canvas canvas)
     {
-        canvas.TranslateFigure(Figure, dx, dy, IsNewOperation);
+        Figure.Translate(dx, dy);
+        
+        // Clear the redo stack only if it's a new operation
+        if (IsNewOperation)
+        {
+            canvas.RedoStack.Clear();
+        }
     }
 
     public override void Undo(Canvas canvas)
     {
-        canvas.TranslateFigure(Figure, -dx, -dy, IsNewOperation);
-    }
-}
-
-internal class ScaleFigureOperation(Figure figure, double sx, double sy) : TransformFigureOperation(figure)
-{
-    public override void Execute(Canvas canvas)
-    {
-        canvas.ScaleFigure(Figure, sx, sy, IsNewOperation);
-    }
-
-    public override void Undo(Canvas canvas)
-    {
-        canvas.ScaleFigure(Figure, 1 / sx, 1 / sy, IsNewOperation);
+        var operation = new TranslateFigureOperation(Figure, -dx, -dy)
+        {
+            IsNewOperation = IsNewOperation
+        };
+        operation.Execute(canvas);
     }
 }
 
@@ -102,12 +149,34 @@ internal class AddUnfinishedCustomFigurePointOperation(UnfinishedCustomFigure fi
 {
     public override void Execute(Canvas canvas)
     {
-        canvas.AddUnfinishedCustomFigurePoint(figure, point, IsNewOperation);
+        // Check if it's the first point
+        if (canvas.CustomFigurePoints.Count == 0)
+        {
+            figure.RemoveLastPoint();
+        }
+        
+        figure.AddPoint(point);
+        
+        canvas.CustomFigurePoints.Add(point);
+        
+        // Clear the redo stack only if it's a new operation
+        if (IsNewOperation)
+        {
+            canvas.CustomFigureRedoStack.Clear();
+        }
     }
 
     public override void Undo(Canvas canvas)
     {
-        canvas.RemoveUnfinishedCustomFigurePoint(figure, IsNewOperation);
+        figure.RemoveLastPoint();
+        
+        canvas.CustomFigurePoints.RemoveAt(canvas.CustomFigurePoints.Count - 1);
+        
+        // Clear the redo stack only if it's a new operation
+        if (IsNewOperation)
+        {
+            canvas.CustomFigureRedoStack.Clear();
+        }
     }
 }
 
@@ -117,12 +186,22 @@ internal class ChangeFillColorOperation(Figure figure, Color newColor) : CanvasO
 
     public override void Execute(Canvas canvas)
     {
-        canvas.ChangeFillColor(figure, newColor, IsNewOperation);
+        figure.FillColor = newColor;
+        
+        // Clear the redo stack only if it's a new operation
+        if (IsNewOperation)
+        {
+            canvas.CustomFigureRedoStack.Clear();
+        }
     }
 
     public override void Undo(Canvas canvas)
     {
-        canvas.ChangeFillColor(figure, _oldColor, IsNewOperation);
+        var operation = new ChangeFillColorOperation(figure, _oldColor)
+        {
+            IsNewOperation = IsNewOperation
+        };
+        operation.Execute(canvas);
     }
 }
 
@@ -132,11 +211,125 @@ internal class ChangeBorderColorOperation(Figure figure, Color newColor) : Canva
 
     public override void Execute(Canvas canvas)
     {
-        canvas.ChangeBorderColor(figure, newColor, IsNewOperation);
+        figure.BorderColor = newColor;
+        
+        // Clear the redo stack only if it's a new operation
+        if (IsNewOperation)
+        {
+            canvas.CustomFigureRedoStack.Clear();
+        }
     }
 
     public override void Undo(Canvas canvas)
     {
-        canvas.ChangeBorderColor(figure, _oldColor, IsNewOperation);
+        var operation = new ChangeBorderColorOperation(figure, _oldColor)
+        {
+            IsNewOperation = IsNewOperation
+        };
+        operation.Execute(canvas);
+    }
+}
+
+internal class ResizeFigureOperation(Figure figure, ResizePosition resizePosition, PointF newMousePosition)
+    : CanvasOperation
+{
+    private readonly RectangleF _oldBoundingBox = figure.GetBounds();
+
+    public override void Execute(Canvas canvas)
+    {
+        var newBoundingBox = CalculateNewBoundingBox();
+        
+        // Scale the figure
+        var sx = newBoundingBox.Width / _oldBoundingBox.Width;
+        var sy = newBoundingBox.Height / _oldBoundingBox.Height;
+        figure.Scale(sx, sy);
+        
+        // Translate the figure based on the new mouse position
+        var realBoundingBox = figure.GetBounds();
+        float dx;
+        float dy;
+        
+        switch (resizePosition)
+        {
+            case ResizePosition.RightMiddle:
+                dx = newMousePosition.X - realBoundingBox.Right;
+                figure.Translate(dx, 0);
+                break;
+            case ResizePosition.LeftMiddle:
+                dx = newMousePosition.X - realBoundingBox.X;
+                figure.Translate(dx, 0);
+                break;
+            case ResizePosition.TopMiddle:
+                dy = newMousePosition.Y - realBoundingBox.Y;
+                figure.Translate(0, dy);
+                break;
+            case ResizePosition.BottomMiddle:
+                dy = newMousePosition.Y - realBoundingBox.Bottom;
+                figure.Translate(0, dy);
+                break;
+            case ResizePosition.TopLeft:
+                dx = newMousePosition.X - realBoundingBox.X;
+                dy = newMousePosition.Y - realBoundingBox.Y;
+                figure.Translate(dx, dy);
+                break;
+            case ResizePosition.TopRight:
+                dx = newMousePosition.X - realBoundingBox.Right;
+                dy = newMousePosition.Y - realBoundingBox.Y;
+                figure.Translate(dx, dy);
+                break;
+            case ResizePosition.BottomLeft:
+                dx = newMousePosition.X - realBoundingBox.X;
+                dy = newMousePosition.Y - realBoundingBox.Bottom;
+                figure.Translate(dx, dy);
+                break;
+            case ResizePosition.BottomRight:
+                dx = newMousePosition.X - realBoundingBox.Right;
+                dy = newMousePosition.Y - realBoundingBox.Bottom;
+                figure.Translate(dx, dy);
+                break;
+        }
+
+        figure.CalculatePivot(new PointF(0, 0));
+        
+        // Clear the redo stack only if it's a new operation
+        if (IsNewOperation)
+        {
+            canvas.RedoStack.Clear();
+        }
+    }
+
+    public override void Undo(Canvas canvas)
+    {
+        var sx = _oldBoundingBox.Width / figure.GetBounds().Width;
+        var sy = _oldBoundingBox.Height / figure.GetBounds().Height;
+        figure.Scale(sx, sy);
+        var dx = _oldBoundingBox.X - figure.GetBounds().X;
+        var dy = _oldBoundingBox.Y - figure.GetBounds().Y;
+        figure.Translate(dx, dy);
+        
+        figure.CalculatePivot(new PointF(0, 0));
+        
+        // Clear the redo stack only if it's a new operation
+        if (IsNewOperation)
+        {
+            canvas.RedoStack.Clear();
+        }
+    }
+
+    private RectangleF CalculateNewBoundingBox()
+    {
+        var oldBox = figure.GetBounds();
+        return resizePosition switch
+        {
+            ResizePosition.TopMiddle => oldBox with { Y = newMousePosition.Y, Height = oldBox.Bottom - newMousePosition.Y },
+            ResizePosition.BottomMiddle => oldBox with { Height = newMousePosition.Y - oldBox.Y },
+            ResizePosition.RightMiddle => oldBox with { Width = newMousePosition.X - oldBox.X },
+            ResizePosition.LeftMiddle => oldBox with { X = newMousePosition.X, Width = oldBox.Right - newMousePosition.X },
+            ResizePosition.TopLeft => new RectangleF(newMousePosition.X, newMousePosition.Y, oldBox.Right - newMousePosition.X, oldBox.Bottom - newMousePosition.Y),
+            ResizePosition.TopRight => new RectangleF(oldBox.X, newMousePosition.Y, newMousePosition.X - oldBox.X, oldBox.Bottom - newMousePosition.Y),
+            ResizePosition.BottomLeft => new RectangleF(newMousePosition.X, oldBox.Y, oldBox.Right - newMousePosition.X, newMousePosition.Y - oldBox.Y),
+            ResizePosition.BottomRight => oldBox with { Width = newMousePosition.X - oldBox.X, Height = newMousePosition.Y - oldBox.Y },
+            _ => throw new ArgumentOutOfRangeException()
+        };
     }
 }
