@@ -7,8 +7,6 @@ public abstract class Figure
     public string Name { get; }
     protected PointF[] Points;
     private PointF _pivot;
-    public double Width => Points.Max(p => p.X) - Points.Min(p => p.X);
-    public double Height => Points.Max(p => p.Y) - Points.Min(p => p.Y);
     public Color BorderColor { get; set; } = Color.White;
     public Color FillColor { get; set; } = Color.FromArgb(128, Color.White);
     public bool IsSelected { get; set; }
@@ -21,7 +19,7 @@ public abstract class Figure
         AdjustPositionToPivot(position); // Adjust the position to match the pivot point
     }
 
-    private void CalculatePivot(PointF pivotOffset)
+    public void CalculatePivot(PointF pivotOffset)
     {
         _pivot = new PointF(Points.Average(p => p.X) + pivotOffset.X, Points.Average(p => p.Y) + pivotOffset.Y);
     }
