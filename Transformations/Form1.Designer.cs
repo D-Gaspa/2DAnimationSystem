@@ -5,7 +5,7 @@
         /// <summary>
         ///  Required designer variable.
         /// </summary>
-        private System.ComponentModel.IContainer components = null;
+        public System.ComponentModel.IContainer components = null;
 
         /// <summary>
         ///  Clean up any resources being used.
@@ -60,6 +60,9 @@
             fillColorCustomFigureButton = new Button();
             redoCustomFigureButton = new Button();
             undoCustomFigureButton = new Button();
+            fillColorSelectedButton = new Button();
+            borderColorSelectedButton = new Button();
+            duplicateButton = new Button();
             ((System.ComponentModel.ISupportInitialize)pictureBox1).BeginInit();
             SuspendLayout();
             // 
@@ -72,6 +75,10 @@
             pictureBox1.Size = new Size(1178, 711);
             pictureBox1.TabIndex = 0;
             pictureBox1.TabStop = false;
+            pictureBox1.MouseClick += PictureBox1_MouseClick;
+            pictureBox1.MouseDown += PictureBox1_MouseDown;
+            pictureBox1.MouseMove += PictureBox1_MouseMove;
+            pictureBox1.MouseUp += PictureBox1_MouseUp;
             // 
             // figuresCheckedListBox
             // 
@@ -82,6 +89,7 @@
             figuresCheckedListBox.Name = "figuresCheckedListBox";
             figuresCheckedListBox.Size = new Size(150, 136);
             figuresCheckedListBox.TabIndex = 10;
+            figuresCheckedListBox.ItemCheck += FiguresCheckedListBox_ItemCheck;
             // 
             // redoButton
             // 
@@ -337,6 +345,7 @@
             addCustomFigureCheckBox.TabIndex = 35;
             addCustomFigureCheckBox.Text = "Add Custom Figure";
             addCustomFigureCheckBox.UseVisualStyleBackColor = true;
+            addCustomFigureCheckBox.CheckedChanged += AddCustomFigureCheckBox_CheckedChanged;
             // 
             // addCustomFigureButton
             // 
@@ -350,6 +359,7 @@
             addCustomFigureButton.TabIndex = 36;
             addCustomFigureButton.Text = "ADD CUSTOM FIGURE";
             addCustomFigureButton.UseVisualStyleBackColor = false;
+            addCustomFigureButton.Click += AddCustomFigureButton_Click;
             // 
             // resetCustomFigureButton
             // 
@@ -363,6 +373,7 @@
             resetCustomFigureButton.TabIndex = 37;
             resetCustomFigureButton.Text = "RESET";
             resetCustomFigureButton.UseVisualStyleBackColor = false;
+            resetCustomFigureButton.Click += ResetCustomFigureButton_Click;
             // 
             // cancelCustomFigureButton
             // 
@@ -376,6 +387,7 @@
             cancelCustomFigureButton.TabIndex = 38;
             cancelCustomFigureButton.Text = "CANCEL";
             cancelCustomFigureButton.UseVisualStyleBackColor = false;
+            cancelCustomFigureButton.Click += CancelCustomFigureButton_Click;
             // 
             // borderColorCustomFigureButton
             // 
@@ -433,6 +445,48 @@
             undoCustomFigureButton.UseVisualStyleBackColor = false;
             undoCustomFigureButton.Click += UndoCustomFigureButton_Click;
             // 
+            // fillColorSelectedButton
+            // 
+            fillColorSelectedButton.BackColor = Color.SteelBlue;
+            fillColorSelectedButton.Cursor = Cursors.Hand;
+            fillColorSelectedButton.Font = new Font("Segoe UI Black", 7F);
+            fillColorSelectedButton.ForeColor = SystemColors.Control;
+            fillColorSelectedButton.Location = new Point(1217, 128);
+            fillColorSelectedButton.Name = "fillColorSelectedButton";
+            fillColorSelectedButton.Size = new Size(123, 30);
+            fillColorSelectedButton.TabIndex = 45;
+            fillColorSelectedButton.Text = "FILL COLOR";
+            fillColorSelectedButton.UseVisualStyleBackColor = false;
+            fillColorSelectedButton.Click += fillColorSelectedButton_Click;
+            // 
+            // borderColorSelectedButton
+            // 
+            borderColorSelectedButton.BackColor = Color.SteelBlue;
+            borderColorSelectedButton.Cursor = Cursors.Hand;
+            borderColorSelectedButton.Font = new Font("Segoe UI Black", 7F);
+            borderColorSelectedButton.ForeColor = SystemColors.Control;
+            borderColorSelectedButton.Location = new Point(1217, 92);
+            borderColorSelectedButton.Name = "borderColorSelectedButton";
+            borderColorSelectedButton.Size = new Size(123, 30);
+            borderColorSelectedButton.TabIndex = 44;
+            borderColorSelectedButton.Text = "BORDER COLOR";
+            borderColorSelectedButton.UseVisualStyleBackColor = false;
+            borderColorSelectedButton.Click += borderColorSelectedButton_Click;
+            // 
+            // duplicateButton
+            // 
+            duplicateButton.BackColor = Color.MidnightBlue;
+            duplicateButton.Cursor = Cursors.Hand;
+            duplicateButton.Font = new Font("Segoe UI Black", 9F);
+            duplicateButton.ForeColor = SystemColors.Control;
+            duplicateButton.Location = new Point(1201, 167);
+            duplicateButton.Name = "duplicateButton";
+            duplicateButton.Size = new Size(151, 30);
+            duplicateButton.TabIndex = 43;
+            duplicateButton.Text = "DUPLICATE";
+            duplicateButton.UseVisualStyleBackColor = false;
+            duplicateButton.Click += DuplicateButton_Click;
+            // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
@@ -441,6 +495,9 @@
             AutoSizeMode = AutoSizeMode.GrowAndShrink;
             BackColor = Color.FromArgb(64, 64, 64);
             ClientSize = new Size(1362, 756);
+            Controls.Add(fillColorSelectedButton);
+            Controls.Add(borderColorSelectedButton);
+            Controls.Add(duplicateButton);
             Controls.Add(redoCustomFigureButton);
             Controls.Add(undoCustomFigureButton);
             Controls.Add(fillColorCustomFigureButton);
@@ -515,5 +572,8 @@
         private Button fillColorCustomFigureButton;
         private Button redoCustomFigureButton;
         private Button undoCustomFigureButton;
+        private Button fillColorSelectedButton;
+        private Button borderColorSelectedButton;
+        private Button duplicateButton;
     }
 }
