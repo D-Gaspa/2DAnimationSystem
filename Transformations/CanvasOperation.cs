@@ -232,14 +232,16 @@ internal class ChangeBorderColorOperation(Figure figure, Color newColor) : Canva
 
 internal class ResizeFigureOperation(
     Figure figure,
-    ResizePosition resizePosition,
+    ResizePosition currentResizePosition,
     RectangleF originalBox,
     PointF newMousePosition)
     : CanvasOperation
 {
     private readonly RectangleF _oldBoundingBox = figure.GetBounds();
-    // private bool _needsXFlip;
-    // private bool _needsYFlip;
+    private bool _needsXFlip;
+    private bool _needsYFlip;
+    private readonly bool _hasFlipped = figure.HasFlipped;
+    private readonly ResizePosition _previousResizePosition = figure.PreviousResizePosition;
     
     public override void Execute(Canvas canvas)
     {
@@ -249,13 +251,10 @@ internal class ResizeFigureOperation(
         if (HasCrossedOppositeSide(originalBox))
         {
             // Calculate the new resize position which is the opposite of the current resize position
-            resizePosition = GetOppositeResizePosition(resizePosition);
+            currentResizePosition = GetOppositeResizePosition(currentResizePosition);
 
             // Calculate the new bounding box based on the new resize position
             newBoundingBox = CalculateOppositeNewBoundingBox(originalBox);
-            
-            // Flip the figure if needed
-            // figure.Flip(_needsXFlip, _needsYFlip);
             
             // Don't execute the operation if the new bounding box is invalid
             if (Math.Abs(newBoundingBox.Width) <= 0 || Math.Abs(newBoundingBox.Height) <= 0)
@@ -263,18 +262,256 @@ internal class ResizeFigureOperation(
                 return;
             }
         }
+        
+        ScaleAndTranslateFigure(newBoundingBox);
 
-        // Scale the figure
+        HandleFlip();
+
+        figure.PreviousResizePosition = currentResizePosition;
+        
+        // Clear the redo stack only if it's a new operation
+        if (IsNewOperation)
+        {
+            canvas.RedoStack.Clear();
+        }
+    }
+
+    public override void Undo(Canvas canvas)
+    {
+        // TODO: REDO IS FLAWED
+        var sx = _oldBoundingBox.Width / figure.GetBounds().Width;
+        var sy = _oldBoundingBox.Height / figure.GetBounds().Height;
+        figure.Scale(sx, sy);
+        var dx = _oldBoundingBox.X - figure.GetBounds().X;
+        var dy = _oldBoundingBox.Y - figure.GetBounds().Y;
+        figure.Translate(dx, dy);
+        
+        figure.CalculatePivot(new PointF(0, 0));
+        
+        // Clear the redo stack only if it's a new operation
+        if (IsNewOperation)
+        {
+            canvas.RedoStack.Clear();
+        }
+    }
+
+    private RectangleF CalculateNewBoundingBox(RectangleF boundingBox)
+    {
+        var newBox = currentResizePosition switch
+        {
+            ResizePosition.TopMiddle => boundingBox with { Y = newMousePosition.Y, Height = boundingBox.Bottom - newMousePosition.Y },
+            ResizePosition.BottomMiddle => boundingBox with { Height = newMousePosition.Y - boundingBox.Y },
+            ResizePosition.RightMiddle => boundingBox with { Width = newMousePosition.X - boundingBox.X },
+            ResizePosition.LeftMiddle => boundingBox with { X = newMousePosition.X, Width = boundingBox.Right - newMousePosition.X },
+            ResizePosition.TopLeft => new RectangleF(newMousePosition.X, newMousePosition.Y, boundingBox.Right - newMousePosition.X, boundingBox.Bottom - newMousePosition.Y),
+            ResizePosition.TopRight => new RectangleF(boundingBox.X, newMousePosition.Y, newMousePosition.X - boundingBox.X, boundingBox.Bottom - newMousePosition.Y),
+            ResizePosition.BottomLeft => new RectangleF(newMousePosition.X, boundingBox.Y, boundingBox.Right - newMousePosition.X, newMousePosition.Y - boundingBox.Y),
+            ResizePosition.BottomRight => boundingBox with { Width = newMousePosition.X - boundingBox.X, Height = newMousePosition.Y - boundingBox.Y },
+            _ => throw new ArgumentOutOfRangeException(nameof(boundingBox))
+        };
+        
+        // Ensure the width and height are not less than the minimum
+        const float minSize = 1f; 
+        if (newBox.Width < minSize)
+        {
+            newBox.Width = minSize;
+        }
+        if (newBox.Height < minSize)
+        {
+            newBox.Height = minSize;
+        }
+
+        return newBox; 
+    }
+    
+    private bool HasCrossedOppositeSide(RectangleF boundingBox)
+    {
+        return currentResizePosition switch
+        {
+            ResizePosition.TopMiddle => newMousePosition.Y > boundingBox.Bottom,
+            ResizePosition.BottomMiddle => newMousePosition.Y < boundingBox.Top,
+            ResizePosition.RightMiddle => newMousePosition.X < boundingBox.Left,
+            ResizePosition.LeftMiddle => newMousePosition.X > boundingBox.Right,
+            ResizePosition.TopLeft => newMousePosition.X > boundingBox.Right || newMousePosition.Y > boundingBox.Bottom,
+            ResizePosition.TopRight => newMousePosition.X < boundingBox.Left || newMousePosition.Y > boundingBox.Bottom,
+            ResizePosition.BottomLeft => newMousePosition.X > boundingBox.Right || newMousePosition.Y < boundingBox.Top,
+            ResizePosition.BottomRight => newMousePosition.X < boundingBox.Left || newMousePosition.Y < boundingBox.Top,
+            _ => throw new ArgumentOutOfRangeException(nameof(boundingBox))
+        };
+    }
+    
+    private static ResizePosition GetOppositeResizePosition(ResizePosition currentResizePosition)
+    {
+        return currentResizePosition switch
+        {
+            ResizePosition.TopMiddle => ResizePosition.BottomMiddle,
+            ResizePosition.BottomMiddle => ResizePosition.TopMiddle,
+            ResizePosition.RightMiddle => ResizePosition.LeftMiddle,
+            ResizePosition.LeftMiddle => ResizePosition.RightMiddle,
+            ResizePosition.TopLeft => ResizePosition.BottomRight,
+            ResizePosition.TopRight => ResizePosition.BottomLeft,
+            ResizePosition.BottomLeft => ResizePosition.TopRight,
+            ResizePosition.BottomRight => ResizePosition.TopLeft,
+            _ => throw new ArgumentOutOfRangeException(nameof(currentResizePosition))
+        };
+    }
+    
+    private RectangleF CalculateOppositeNewBoundingBox(RectangleF boundingBox)
+    {
+        return currentResizePosition switch
+        {
+            ResizePosition.TopMiddle => CalculateTopMiddleOppositeNewBoundingBox(boundingBox),
+            ResizePosition.BottomMiddle => CalculateBottomMiddleOppositeNewBoundingBox(boundingBox),
+            ResizePosition.RightMiddle => CalculateRightMiddleOppositeNewBoundingBox(boundingBox),
+            ResizePosition.LeftMiddle => CalculateLeftMiddleOppositeNewBoundingBox(boundingBox),
+            ResizePosition.TopLeft => CalculateTopLeftOppositeNewBoundingBox(boundingBox),
+            ResizePosition.TopRight => CalculateTopRightOppositeNewBoundingBox(boundingBox),
+            ResizePosition.BottomLeft => CalculateBottomLeftOppositeNewBoundingBox(boundingBox),
+            ResizePosition.BottomRight => CalculateBottomRightOppositeNewBoundingBox(boundingBox),
+            _ => throw new ArgumentOutOfRangeException(nameof(boundingBox))
+        };
+    }
+    
+    private RectangleF CalculateTopMiddleOppositeNewBoundingBox(RectangleF boundingBox)
+    {
+        _needsYFlip = true;
+        return boundingBox with { Y = newMousePosition.Y, Height = boundingBox.Top - newMousePosition.Y };
+    }
+    
+    private RectangleF CalculateBottomMiddleOppositeNewBoundingBox(RectangleF boundingBox)
+    {
+        _needsYFlip = true;
+        return boundingBox with { Y = newMousePosition.Y, Height = newMousePosition.Y - boundingBox.Bottom };
+    }
+    
+    private RectangleF CalculateRightMiddleOppositeNewBoundingBox(RectangleF boundingBox)
+    {
+        _needsXFlip = true;
+        return boundingBox with { Width = newMousePosition.X - boundingBox.Right };
+    }
+    
+    private RectangleF CalculateLeftMiddleOppositeNewBoundingBox(RectangleF boundingBox)
+    {
+        _needsXFlip = true;
+        return boundingBox with { X = newMousePosition.X, Width = boundingBox.Left - newMousePosition.X };
+    }
+
+    private RectangleF CalculateTopLeftOppositeNewBoundingBox(RectangleF boundingBox)
+    {
+        // If the new mouse position is on the left of the figure and above the figure
+        if (newMousePosition.X <= boundingBox.X && newMousePosition.Y < boundingBox.Y)
+        {
+            _needsXFlip = true;
+            _needsYFlip = true;
+            return new RectangleF(newMousePosition.X, newMousePosition.Y, boundingBox.Left - newMousePosition.X,
+                boundingBox.Top - newMousePosition.Y);
+        }
+        // If the new mouse position is on the left of the figure without going above the figure
+        if (newMousePosition.X <= boundingBox.X && newMousePosition.Y > boundingBox.Y)
+        {
+            _needsXFlip = true;
+            currentResizePosition = ResizePosition.BottomLeft;
+            return new RectangleF(newMousePosition.X, boundingBox.Top, boundingBox.Left - newMousePosition.X,
+                newMousePosition.Y - boundingBox.Top);
+        }
+        // If the new mouse position is above the figure without going to the left of the figure
+        _needsYFlip = true;
+        currentResizePosition = ResizePosition.TopRight;
+        return boundingBox with { Y = newMousePosition.Y, Width = newMousePosition.X - boundingBox.X, Height = boundingBox.Y - newMousePosition.Y };
+    }
+    
+    private RectangleF CalculateTopRightOppositeNewBoundingBox(RectangleF boundingBox)
+    {
+        // If the new mouse position is on the right of the figure and above the figure
+        if (newMousePosition.X >= boundingBox.Right && newMousePosition.Y < boundingBox.Y)
+        {
+            _needsXFlip = true;
+            _needsYFlip = true;
+            return new RectangleF(boundingBox.Right, newMousePosition.Y, newMousePosition.X - boundingBox.Right,
+                boundingBox.Top - newMousePosition.Y);
+        }
+        // If the new mouse position is on the right of the figure without going above the figure
+        if (newMousePosition.X >= boundingBox.Right && newMousePosition.Y > boundingBox.Y)
+        {
+            _needsXFlip = true;
+            currentResizePosition = ResizePosition.BottomRight;
+            return new RectangleF(boundingBox.Right, boundingBox.Top, newMousePosition.X - boundingBox.Right,
+                newMousePosition.Y - boundingBox.Top);
+        }
+        // If the new mouse position is above the figure without going to the right of the figure
+        _needsYFlip = true;
+        currentResizePosition = ResizePosition.TopLeft;
+        return new RectangleF(newMousePosition.X, newMousePosition.Y, boundingBox.Right - newMousePosition.X,
+            boundingBox.Y - newMousePosition.Y);
+    }
+    
+    private RectangleF CalculateBottomLeftOppositeNewBoundingBox(RectangleF boundingBox)
+    {
+        // If the new mouse position is on the left of the figure and below the figure
+        if (newMousePosition.X <= boundingBox.X && newMousePosition.Y > boundingBox.Bottom)
+        {
+            _needsXFlip = true;
+            _needsYFlip = true;
+            return new RectangleF(newMousePosition.X, boundingBox.Bottom, boundingBox.Left - newMousePosition.X,
+                newMousePosition.Y - boundingBox.Bottom);
+        }
+        // If the new mouse position is on the left of the figure without going below the figure
+        if (newMousePosition.X <= boundingBox.X && newMousePosition.Y < boundingBox.Bottom)
+        {
+            _needsXFlip = true;
+            currentResizePosition = ResizePosition.TopLeft;
+            return new RectangleF(newMousePosition.X, newMousePosition.Y, boundingBox.Left - newMousePosition.X,
+                boundingBox.Bottom - newMousePosition.Y);
+        }
+        // If the new mouse position is below the figure without going to the left of the figure
+        _needsYFlip = true;
+        currentResizePosition = ResizePosition.BottomRight;
+        return new RectangleF(newMousePosition.X, boundingBox.Bottom, boundingBox.Left - newMousePosition.X,
+            newMousePosition.Y - boundingBox.Bottom);
+    }
+    
+    private RectangleF CalculateBottomRightOppositeNewBoundingBox(RectangleF boundingBox)
+    {
+        // If the new mouse position is on the right of the figure and below the figure
+        if (newMousePosition.X >= boundingBox.Right && newMousePosition.Y > boundingBox.Bottom)
+        {
+            _needsXFlip = true;
+            _needsYFlip = true;
+            return new RectangleF(boundingBox.Right, boundingBox.Bottom, newMousePosition.X - boundingBox.Right,
+                newMousePosition.Y - boundingBox.Bottom);
+        }
+
+        // If the new mouse position is on the right of the figure without going below the figure
+        if (newMousePosition.X >= boundingBox.Right && newMousePosition.Y < boundingBox.Bottom)
+        {
+            _needsXFlip = true;
+            currentResizePosition = ResizePosition.TopRight;
+            return new RectangleF(boundingBox.Right, newMousePosition.Y, newMousePosition.X - boundingBox.Right,
+                boundingBox.Bottom - newMousePosition.Y);
+        }
+        // If the new mouse position is below the figure without going to the right of the figure
+        _needsYFlip = true;
+        currentResizePosition = ResizePosition.BottomLeft;
+        return new RectangleF(newMousePosition.X, boundingBox.Bottom, boundingBox.Right - newMousePosition.X,
+            newMousePosition.Y - boundingBox.Bottom);
+    }
+    
+    private void ScaleAndTranslateFigure(RectangleF newBoundingBox)
+    {
         var sx = newBoundingBox.Width / _oldBoundingBox.Width;
         var sy = newBoundingBox.Height / _oldBoundingBox.Height;
         figure.Scale(sx, sy);
-        
-        // Translate the figure based on the new mouse position and the real bounding box
+
+        TranslateFigureBasedOnNewMousePositionAndRealBoundingBox();
+    }
+
+    private void TranslateFigureBasedOnNewMousePositionAndRealBoundingBox()
+    {
         var realBoundingBox = figure.GetBounds();
         float dx;
         float dy;
-        
-        switch (resizePosition)
+
+        switch (currentResizePosition)
         {
             case ResizePosition.RightMiddle:
                 dx = newMousePosition.X - realBoundingBox.Right;
@@ -312,234 +549,62 @@ internal class ResizeFigureOperation(
                 dy = newMousePosition.Y - realBoundingBox.Bottom;
                 figure.Translate(dx, dy);
                 break;
-        }
-        
-        figure.CalculatePivot(new PointF(0, 0));
-        
-        // Clear the redo stack only if it's a new operation
-        if (IsNewOperation)
-        {
-            canvas.RedoStack.Clear();
+            default:
+                throw new ArgumentOutOfRangeException(nameof(currentResizePosition), currentResizePosition, null);
         }
     }
 
-    public override void Undo(Canvas canvas)
+    private void HandleFlip()
     {
-        // TODO: REDO IS FLAWED
-        var sx = _oldBoundingBox.Width / figure.GetBounds().Width;
-        var sy = _oldBoundingBox.Height / figure.GetBounds().Height;
-        figure.Scale(sx, sy);
-        var dx = _oldBoundingBox.X - figure.GetBounds().X;
-        var dy = _oldBoundingBox.Y - figure.GetBounds().Y;
-        figure.Translate(dx, dy);
-        
-        figure.CalculatePivot(new PointF(0, 0));
-        
-        // Clear the redo stack only if it's a new operation
-        if (IsNewOperation)
-        {
-            canvas.RedoStack.Clear();
-        }
-    }
+        var needsFlip = _needsYFlip || _needsXFlip;
 
-    private RectangleF CalculateNewBoundingBox(RectangleF boundingBox)
-    {
-        var newBox = resizePosition switch
+        if (_hasFlipped)
         {
-            ResizePosition.TopMiddle => boundingBox with { Y = newMousePosition.Y, Height = boundingBox.Bottom - newMousePosition.Y },
-            ResizePosition.BottomMiddle => boundingBox with { Height = newMousePosition.Y - boundingBox.Y },
-            ResizePosition.RightMiddle => boundingBox with { Width = newMousePosition.X - boundingBox.X },
-            ResizePosition.LeftMiddle => boundingBox with { X = newMousePosition.X, Width = boundingBox.Right - newMousePosition.X },
-            ResizePosition.TopLeft => new RectangleF(newMousePosition.X, newMousePosition.Y, boundingBox.Right - newMousePosition.X, boundingBox.Bottom - newMousePosition.Y),
-            ResizePosition.TopRight => new RectangleF(boundingBox.X, newMousePosition.Y, newMousePosition.X - boundingBox.X, boundingBox.Bottom - newMousePosition.Y),
-            ResizePosition.BottomLeft => new RectangleF(newMousePosition.X, boundingBox.Y, boundingBox.Right - newMousePosition.X, newMousePosition.Y - boundingBox.Y),
-            ResizePosition.BottomRight => boundingBox with { Width = newMousePosition.X - boundingBox.X, Height = newMousePosition.Y - boundingBox.Y },
-            _ => throw new ArgumentOutOfRangeException()
+            if (_previousResizePosition == currentResizePosition)
+            {
+                needsFlip = false;
+            }
+            else
+            {
+                _needsXFlip = false;
+                _needsYFlip = false;
+
+                var flipActions = CreateFlipActions();
+
+                if (flipActions.TryGetValue((_previousResizePosition, currentResizePosition), out var action))
+                {
+                    action();
+                }
+
+                needsFlip = true;
+            }
+        }
+
+        if (!needsFlip) return;
+        figure.Flip(_needsXFlip, _needsYFlip);
+        figure.HasFlipped = true;
+    }
+    
+    private Dictionary<(ResizePosition, ResizePosition), Action> CreateFlipActions()
+    {
+        return new Dictionary<(ResizePosition, ResizePosition), Action>
+        {
+            { (ResizePosition.LeftMiddle, ResizePosition.RightMiddle), () => _needsXFlip = true },
+            { (ResizePosition.RightMiddle, ResizePosition.LeftMiddle), () => _needsXFlip = true },
+            { (ResizePosition.TopMiddle, ResizePosition.BottomMiddle), () => _needsYFlip = true },
+            { (ResizePosition.BottomMiddle, ResizePosition.TopMiddle), () => _needsYFlip = true },
+            { (ResizePosition.BottomLeft, ResizePosition.TopLeft), () => _needsYFlip = true },
+            { (ResizePosition.BottomLeft, ResizePosition.BottomRight), () => _needsXFlip = true },
+            { (ResizePosition.BottomLeft, ResizePosition.TopRight), () => { _needsXFlip = true; _needsYFlip = true; } },
+            { (ResizePosition.BottomRight, ResizePosition.TopRight), () => _needsYFlip = true },
+            { (ResizePosition.BottomRight, ResizePosition.BottomLeft), () => _needsXFlip = true },
+            { (ResizePosition.BottomRight, ResizePosition.TopLeft), () => { _needsXFlip = true; _needsYFlip = true; } },
+            { (ResizePosition.TopLeft, ResizePosition.BottomLeft), () => _needsYFlip = true },
+            { (ResizePosition.TopLeft, ResizePosition.TopRight), () => _needsXFlip = true },
+            { (ResizePosition.TopLeft, ResizePosition.BottomRight), () => { _needsXFlip = true; _needsYFlip = true; } },
+            { (ResizePosition.TopRight, ResizePosition.BottomRight), () => _needsYFlip = true },
+            { (ResizePosition.TopRight, ResizePosition.TopLeft), () => _needsXFlip = true },
+            { (ResizePosition.TopRight, ResizePosition.BottomLeft), () => { _needsXFlip = true; _needsYFlip = true; } }
         };
-        
-        // Ensure the width and height are not less than the minimum
-        const float minSize = 1f; 
-        if (newBox.Width < minSize)
-        {
-            newBox.Width = minSize;
-        }
-        if (newBox.Height < minSize)
-        {
-            newBox.Height = minSize;
-        }
-
-        return newBox; 
-    }
-    
-    private bool HasCrossedOppositeSide(RectangleF boundingBox)
-    {
-        return resizePosition switch
-        {
-            ResizePosition.TopMiddle => newMousePosition.Y > boundingBox.Bottom,
-            ResizePosition.BottomMiddle => newMousePosition.Y < boundingBox.Top,
-            ResizePosition.RightMiddle => newMousePosition.X < boundingBox.Left,
-            ResizePosition.LeftMiddle => newMousePosition.X > boundingBox.Right,
-            ResizePosition.TopLeft => newMousePosition.X > boundingBox.Right || newMousePosition.Y > boundingBox.Bottom,
-            ResizePosition.TopRight => newMousePosition.X < boundingBox.Left || newMousePosition.Y > boundingBox.Bottom,
-            ResizePosition.BottomLeft => newMousePosition.X > boundingBox.Right || newMousePosition.Y < boundingBox.Top,
-            ResizePosition.BottomRight => newMousePosition.X < boundingBox.Left || newMousePosition.Y < boundingBox.Top,
-            _ => throw new ArgumentOutOfRangeException(nameof(boundingBox))
-        };
-    }
-    
-    private static ResizePosition GetOppositeResizePosition(ResizePosition currentResizePosition)
-    {
-        return currentResizePosition switch
-        {
-            ResizePosition.TopMiddle => ResizePosition.BottomMiddle,
-            ResizePosition.BottomMiddle => ResizePosition.TopMiddle,
-            ResizePosition.RightMiddle => ResizePosition.LeftMiddle,
-            ResizePosition.LeftMiddle => ResizePosition.RightMiddle,
-            ResizePosition.TopLeft => ResizePosition.BottomRight,
-            ResizePosition.TopRight => ResizePosition.BottomLeft,
-            ResizePosition.BottomLeft => ResizePosition.TopRight,
-            ResizePosition.BottomRight => ResizePosition.TopLeft,
-            _ => throw new ArgumentOutOfRangeException(nameof(currentResizePosition))
-        };
-    }
-    
-    private RectangleF CalculateOppositeNewBoundingBox(RectangleF boundingBox)
-    {
-        return resizePosition switch
-        {
-            ResizePosition.TopMiddle => CalculateTopMiddleOppositeNewBoundingBox(boundingBox),
-            ResizePosition.BottomMiddle => CalculateBottomMiddleOppositeNewBoundingBox(boundingBox),
-            ResizePosition.RightMiddle => CalculateRightMiddleOppositeNewBoundingBox(boundingBox),
-            ResizePosition.LeftMiddle => CalculateLeftMiddleOppositeNewBoundingBox(boundingBox),
-            ResizePosition.TopLeft => CalculateTopLeftOppositeNewBoundingBox(boundingBox),
-            ResizePosition.TopRight => CalculateTopRightOppositeNewBoundingBox(boundingBox),
-            ResizePosition.BottomLeft => CalculateBottomLeftOppositeNewBoundingBox(boundingBox),
-            ResizePosition.BottomRight => CalculateBottomRightOppositeNewBoundingBox(boundingBox),
-            _ => throw new ArgumentOutOfRangeException(nameof(resizePosition))
-        };
-    }
-    
-    private RectangleF CalculateTopMiddleOppositeNewBoundingBox(RectangleF boundingBox)
-    {
-        //_needsYFlip = true;
-        return boundingBox with { Y = newMousePosition.Y, Height = boundingBox.Top - newMousePosition.Y };
-    }
-    
-    private RectangleF CalculateBottomMiddleOppositeNewBoundingBox(RectangleF boundingBox)
-    {
-        //_needsYFlip = true;
-        return boundingBox with { Y = newMousePosition.Y, Height = newMousePosition.Y - boundingBox.Bottom };
-    }
-    
-    private RectangleF CalculateRightMiddleOppositeNewBoundingBox(RectangleF boundingBox)
-    {
-        // _needsXFlip = true;
-        return boundingBox with { Width = newMousePosition.X - boundingBox.Right };
-    }
-    
-    private RectangleF CalculateLeftMiddleOppositeNewBoundingBox(RectangleF boundingBox)
-    {
-        // _needsXFlip = true;
-        return boundingBox with { X = newMousePosition.X, Width = boundingBox.Left - newMousePosition.X };
-    }
-
-    private RectangleF CalculateTopLeftOppositeNewBoundingBox(RectangleF boundingBox)
-    {
-        // If the new mouse position is on the left of the figure and above the figure
-        if (newMousePosition.X <= boundingBox.X && newMousePosition.Y < boundingBox.Y)
-        {
-            // _needsXFlip = true;
-            // _needsYFlip = true;
-            return new RectangleF(newMousePosition.X, newMousePosition.Y, boundingBox.Left - newMousePosition.X,
-                boundingBox.Top - newMousePosition.Y);
-        }
-        // If the new mouse position is on the left of the figure without going above the figure
-        if (newMousePosition.X <= boundingBox.X && newMousePosition.Y > boundingBox.Y)
-        {
-            // _needsXFlip = true;
-            resizePosition = ResizePosition.BottomLeft;
-            return new RectangleF(newMousePosition.X, boundingBox.Top, boundingBox.Left - newMousePosition.X,
-                newMousePosition.Y - boundingBox.Top);
-        }
-        // If the new mouse position is above the figure without going to the left of the figure
-        // _needsYFlip = true;
-        resizePosition = ResizePosition.TopRight;
-        return boundingBox with { Y = newMousePosition.Y, Width = newMousePosition.X - boundingBox.X, Height = boundingBox.Y - newMousePosition.Y };
-    }
-    
-    private RectangleF CalculateTopRightOppositeNewBoundingBox(RectangleF boundingBox)
-    {
-        // If the new mouse position is on the right of the figure and above the figure
-        if (newMousePosition.X >= boundingBox.Right && newMousePosition.Y < boundingBox.Y)
-        {
-            // _needsXFlip = true;
-            // _needsYFlip = true;
-            return new RectangleF(boundingBox.Right, newMousePosition.Y, newMousePosition.X - boundingBox.Right,
-                boundingBox.Top - newMousePosition.Y);
-        }
-        // If the new mouse position is on the right of the figure without going above the figure
-        if (newMousePosition.X >= boundingBox.Right && newMousePosition.Y > boundingBox.Y)
-        {
-            // _needsXFlip = true;
-            resizePosition = ResizePosition.BottomRight;
-            return new RectangleF(boundingBox.Right, boundingBox.Top, newMousePosition.X - boundingBox.Right,
-                newMousePosition.Y - boundingBox.Top);
-        }
-        // If the new mouse position is above the figure without going to the right of the figure
-        // _needsYFlip = true;
-        resizePosition = ResizePosition.TopLeft;
-        return new RectangleF(newMousePosition.X, newMousePosition.Y, boundingBox.Right - newMousePosition.X,
-            boundingBox.Y - newMousePosition.Y);
-    }
-    
-    private RectangleF CalculateBottomLeftOppositeNewBoundingBox(RectangleF boundingBox)
-    {
-        // If the new mouse position is on the left of the figure and below the figure
-        if (newMousePosition.X <= boundingBox.X && newMousePosition.Y > boundingBox.Bottom)
-        {
-            // _needsXFlip = true;
-            // _needsYFlip = true;
-            return new RectangleF(newMousePosition.X, boundingBox.Bottom, boundingBox.Left - newMousePosition.X,
-                newMousePosition.Y - boundingBox.Bottom);
-        }
-        // If the new mouse position is on the left of the figure without going below the figure
-        if (newMousePosition.X <= boundingBox.X && newMousePosition.Y < boundingBox.Bottom)
-        {
-            // _needsXFlip = true;
-            resizePosition = ResizePosition.TopLeft;
-            return new RectangleF(newMousePosition.X, newMousePosition.Y, boundingBox.Left - newMousePosition.X,
-                boundingBox.Bottom - newMousePosition.Y);
-        }
-        // If the new mouse position is below the figure without going to the left of the figure
-        // _needsYFlip = true;
-        resizePosition = ResizePosition.BottomRight;
-        return new RectangleF(newMousePosition.X, boundingBox.Bottom, boundingBox.Left - newMousePosition.X,
-            newMousePosition.Y - boundingBox.Bottom);
-    }
-    
-    private RectangleF CalculateBottomRightOppositeNewBoundingBox(RectangleF boundingBox)
-    {
-        // If the new mouse position is on the right of the figure and below the figure
-        if (newMousePosition.X >= boundingBox.Right && newMousePosition.Y > boundingBox.Bottom)
-        {
-            // _needsXFlip = true;
-            // _needsYFlip = true;
-            return new RectangleF(boundingBox.Right, boundingBox.Bottom, newMousePosition.X - boundingBox.Right,
-                newMousePosition.Y - boundingBox.Bottom);
-        }
-
-        // If the new mouse position is on the right of the figure without going below the figure
-        if (newMousePosition.X >= boundingBox.Right && newMousePosition.Y < boundingBox.Bottom)
-        {
-            // _needsXFlip = true;
-            resizePosition = ResizePosition.TopRight;
-            return new RectangleF(boundingBox.Right, newMousePosition.Y, newMousePosition.X - boundingBox.Right,
-                boundingBox.Bottom - newMousePosition.Y);
-        }
-        // If the new mouse position is below the figure without going to the right of the figure
-        // _needsYFlip = true;
-        resizePosition = ResizePosition.BottomLeft;
-        return new RectangleF(newMousePosition.X, boundingBox.Bottom, boundingBox.Right - newMousePosition.X,
-            newMousePosition.Y - boundingBox.Bottom);
     }
 }
