@@ -10,6 +10,13 @@ public abstract class Figure
     public Color BorderColor { get; set; } = Color.White;
     public Color FillColor { get; set; } = Color.FromArgb(128, Color.White);
     public bool IsSelected { get; set; }
+    public bool NeedXFlip { get; set; }
+    public bool NeedYFlip { get; set; }
+    public bool HasXFlipped { get; set; }
+    public bool HasYFlipped { get; set; }
+    public bool CanFlipX { get; set; } = true;
+    public bool CanFlipY { get; set; } = true;
+    
     
     protected Figure(PointF[] points, PointF position, PointF pivotOffset, string name)
     {
@@ -100,20 +107,35 @@ public abstract class Figure
     {
         return (Figure)MemberwiseClone();
     }
-
+    
+    public void Flip(bool needsXFlip, bool needsYFlip)
+    {
+        var bounds = GetBounds();
+        var pivot = new PointF(bounds.Left + bounds.Width / 2, bounds.Top + bounds.Height / 2);
+        var flipMatrix = new Matrix();
+        flipMatrix.Translate(pivot.X, pivot.Y);
+        flipMatrix.Scale(needsXFlip ? -1 : 1, needsYFlip ? -1 : 1);
+        flipMatrix.Translate(-pivot.X, -pivot.Y);
+        flipMatrix.TransformPoints(Points);
+    }
+    
     public virtual void Draw(Graphics g)
     {
-        // Draw the figure with the specified border and fill colors
+        // Draw the figure
         using var fillBrush = new SolidBrush(FillColor);
-        using var borderPen = new Pen(BorderColor);
         g.FillPolygon(fillBrush, Points);
+
+        using var borderPen = new Pen(BorderColor);
         g.DrawPolygon(borderPen, Points);
 
         // Draw the pivot point as a small circle
         const float pivotSize = 5; // Size of the pivot circle
-        using var pivotPen = new Pen(Color.Red);
-        g.DrawEllipse(pivotPen, _pivot.X - pivotSize / 2, _pivot.Y - pivotSize / 2, pivotSize, pivotSize);
-        
+        if (_pivot.X - pivotSize / 2 >= 0 && _pivot.Y - pivotSize / 2 >= 0 && _pivot.X + pivotSize / 2 <= g.VisibleClipBounds.Width && _pivot.Y + pivotSize / 2 <= g.VisibleClipBounds.Height)
+        {
+            using var pivotPen = new Pen(Color.Red);
+            g.DrawEllipse(pivotPen, _pivot.X - pivotSize / 2, _pivot.Y - pivotSize / 2, pivotSize, pivotSize);
+        }
+
         // Draw the selection points and the selection rectangle
         if (!IsSelected) return;
         var bounds = GetBounds();
