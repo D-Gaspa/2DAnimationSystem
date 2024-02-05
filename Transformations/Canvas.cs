@@ -1,8 +1,6 @@
 ﻿namespace Transformations;
 internal sealed class Canvas
 {
-    // Border and Fill colors when adding figures are not being applied
-    
     public readonly List<Figure> Figures = [];
     public readonly List<PointF> CustomFigurePoints = [];
     public readonly Stack<CanvasOperation> UndoStack = new();
@@ -28,7 +26,7 @@ internal sealed class Canvas
         {
             "Square" => $"Square {_squareCounter++}",
             "Triangle" => $"Triangle {_triangleCounter++}",
-            "Custom" => $"Custom {_customFigureCounter++}",
+            "CustomFigure" => $"Custom {_customFigureCounter++}",
             _ => throw new InvalidOperationException("Unsupported figure type.")
         };
     }

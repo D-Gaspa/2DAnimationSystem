@@ -242,6 +242,8 @@ internal class ResizeFigureOperation(
     private bool _needsYFlip;
     private readonly bool _hasFlipped = figure.HasFlipped;
     private readonly ResizePosition _previousResizePosition = figure.PreviousResizePosition;
+    private bool _wasFlippedX;
+    private bool _wasFlippedY;
     
     public override void Execute(Canvas canvas)
     {
@@ -278,21 +280,33 @@ internal class ResizeFigureOperation(
 
     public override void Undo(Canvas canvas)
     {
-        // TODO: REDO IS FLAWED
+        // If the figure was flipped, flip it back
+        if (_wasFlippedX || _wasFlippedY)
+        {
+            figure.Flip(_wasFlippedX, _wasFlippedY);
+        }
+
+        // Scale and translate the figure back to its original state
         var sx = _oldBoundingBox.Width / figure.GetBounds().Width;
         var sy = _oldBoundingBox.Height / figure.GetBounds().Height;
         figure.Scale(sx, sy);
         var dx = _oldBoundingBox.X - figure.GetBounds().X;
         var dy = _oldBoundingBox.Y - figure.GetBounds().Y;
         figure.Translate(dx, dy);
-        
-        figure.CalculatePivot(new PointF(0, 0));
-        
+
         // Clear the redo stack only if it's a new operation
         if (IsNewOperation)
         {
             canvas.RedoStack.Clear();
         }
+
+        // Reset the flip flags
+        figure.HasFlipped = false;
+        _wasFlippedX = false;
+        _wasFlippedY = false;
+        
+        // Reset the previous resize position
+        currentResizePosition = _previousResizePosition;
     }
 
     private RectangleF CalculateNewBoundingBox(RectangleF boundingBox)
@@ -582,6 +596,8 @@ internal class ResizeFigureOperation(
 
         if (!needsFlip) return;
         figure.Flip(_needsXFlip, _needsYFlip);
+        _wasFlippedX = _needsXFlip;
+        _wasFlippedY = _needsYFlip;
         figure.HasFlipped = true;
     }
     
@@ -606,5 +622,61 @@ internal class ResizeFigureOperation(
             { (ResizePosition.TopRight, ResizePosition.TopLeft), () => _needsXFlip = true },
             { (ResizePosition.TopRight, ResizePosition.BottomLeft), () => { _needsXFlip = true; _needsYFlip = true; } }
         };
+    }
+}
+
+internal class MovePivotOperation(Figure figure, PointF newPivot) : CanvasOperation
+{
+    private readonly PointF _oldPivot = figure.Pivot;
+
+    public override void Execute(Canvas canvas)
+    {
+        figure.Pivot = newPivot;
+        
+        // Clear the redo stack only if it's a new operation
+        if (IsNewOperation)
+        {
+            canvas.RedoStack.Clear();
+        }
+    }
+
+    public override void Undo(Canvas canvas)
+    {
+        var operation = new MovePivotOperation(figure, _oldPivot)
+        {
+            IsNewOperation = IsNewOperation
+        };
+        operation.Execute(canvas);
+    }
+}
+
+internal class DuplicateFigureOperation(Figure figure) : CanvasOperation
+{
+    private Figure _duplicate = null!;
+
+    public override void Execute(Canvas canvas)
+    {
+        figure.IsSelected = false;
+        _duplicate = figure.Clone();
+        _duplicate.Translate(20, 20);
+        _duplicate.Name = canvas.GenerateUniqueFigureName(figure.GetType().Name);
+        _duplicate.IsSelected = true;
+        canvas.Figures.Add(_duplicate);
+        canvas.OnFigureAdded(_duplicate);
+        
+        // Clear the redo stack only if it's a new operation
+        if (IsNewOperation)
+        {
+            canvas.RedoStack.Clear();
+        }
+    }
+
+    public override void Undo(Canvas canvas)
+    {
+        var operation = new DeleteFigureOperation(_duplicate)
+        {
+            IsNewOperation = IsNewOperation
+        };
+        operation.Execute(canvas);
     }
 }

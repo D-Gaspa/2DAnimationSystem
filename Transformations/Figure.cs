@@ -4,9 +4,9 @@ namespace Transformations;
 
 public abstract class Figure
 {
-    public string Name { get; }
+    public string Name { get; set; }
     protected PointF[] Points;
-    private PointF _pivot;
+    public PointF Pivot;
     public Color BorderColor { get; set; } = Color.White;
     public Color FillColor { get; set; } = Color.FromArgb(128, Color.White);
     public bool IsSelected { get; set; }
@@ -21,15 +21,15 @@ public abstract class Figure
         AdjustPositionToPivot(position); // Adjust the position to match the pivot point
     }
 
-    public void CalculatePivot(PointF pivotOffset)
+    private void CalculatePivot(PointF pivotOffset)
     {
-        _pivot = new PointF(Points.Average(p => p.X) + pivotOffset.X, Points.Average(p => p.Y) + pivotOffset.Y);
+        Pivot = new PointF(Points.Average(p => p.X) + pivotOffset.X, Points.Average(p => p.Y) + pivotOffset.Y);
     }
 
     private void AdjustPositionToPivot(PointF position)
     {
-        Translate(position.X - _pivot.X, position.Y - _pivot.Y);
-        _pivot = position; // Adjust pivot to match the specified position
+        Translate(position.X - Pivot.X, position.Y - Pivot.Y);
+        Pivot = position; // Adjust pivot to match the specified position
     }
 
     public void Rotate(double angle)
@@ -37,11 +37,11 @@ public abstract class Figure
         var radiansAngle = angle * Math.PI / 180;
         Points = Points.Select(p =>
         {
-            var x = p.X - _pivot.X;
-            var y = p.Y - _pivot.Y;
+            var x = p.X - Pivot.X;
+            var y = p.Y - Pivot.Y;
 
-            var newX = x * Math.Cos(radiansAngle) - y * Math.Sin(radiansAngle) + _pivot.X;
-            var newY = x * Math.Sin(radiansAngle) + y * Math.Cos(radiansAngle) + _pivot.Y;
+            var newX = x * Math.Cos(radiansAngle) - y * Math.Sin(radiansAngle) + Pivot.X;
+            var newY = x * Math.Sin(radiansAngle) + y * Math.Cos(radiansAngle) + Pivot.Y;
 
             return new PointF((float)newX, (float)newY);
         }).ToArray();
@@ -50,15 +50,15 @@ public abstract class Figure
     public void Translate(double dx, double dy)
     {
         Points = Points.Select(p => new PointF((float)(p.X + dx), (float)(p.Y + dy))).ToArray();
-        _pivot = new PointF((float)(_pivot.X + dx), (float)(_pivot.Y + dy));
+        Pivot = new PointF((float)(Pivot.X + dx), (float)(Pivot.Y + dy));
     }
 
     public void Scale(double sx, double sy)
     {
         Points = Points.Select(p =>
         {
-            var x = (p.X - _pivot.X) * sx + _pivot.X;
-            var y = (p.Y - _pivot.Y) * sy + _pivot.Y;
+            var x = (p.X - Pivot.X) * sx + Pivot.X;
+            var y = (p.Y - Pivot.Y) * sy + Pivot.Y;
 
             return new PointF((float)x, (float)y);
         }).ToArray();
@@ -113,9 +113,9 @@ public abstract class Figure
         flipMatrix.Translate(-pivot.X, -pivot.Y);
         flipMatrix.TransformPoints(Points);
         
-        var pivotPoints = new[] { _pivot };
+        var pivotPoints = new[] { Pivot };
         flipMatrix.TransformPoints(pivotPoints);
-        _pivot = pivotPoints[0];
+        Pivot = pivotPoints[0];
     }
     
     public virtual void Draw(Graphics g)
@@ -126,13 +126,21 @@ public abstract class Figure
 
         using var borderPen = new Pen(BorderColor);
         g.DrawPolygon(borderPen, Points);
+        
+        // // Draw coordinates
+        // var font = new Font("Arial", 8);
+        // var brush = new SolidBrush(Color.White);
+        // foreach (var point in Points)
+        // {
+        //     g.DrawString($"({point.X}, {point.Y})", font, brush, point);
+        // }
 
         // Draw the pivot point as a small circle
         const float pivotSize = 5; // Size of the pivot circle
-        if (_pivot.X - pivotSize / 2 >= 0 && _pivot.Y - pivotSize / 2 >= 0 && _pivot.X + pivotSize / 2 <= g.VisibleClipBounds.Width && _pivot.Y + pivotSize / 2 <= g.VisibleClipBounds.Height)
+        if (Pivot.X - pivotSize / 2 >= 0 && Pivot.Y - pivotSize / 2 >= 0 && Pivot.X + pivotSize / 2 <= g.VisibleClipBounds.Width && Pivot.Y + pivotSize / 2 <= g.VisibleClipBounds.Height)
         {
             using var pivotPen = new Pen(Color.Red);
-            g.DrawEllipse(pivotPen, _pivot.X - pivotSize / 2, _pivot.Y - pivotSize / 2, pivotSize, pivotSize);
+            g.DrawEllipse(pivotPen, Pivot.X - pivotSize / 2, Pivot.Y - pivotSize / 2, pivotSize, pivotSize);
         }
 
         // Draw the selection points and the selection rectangle
