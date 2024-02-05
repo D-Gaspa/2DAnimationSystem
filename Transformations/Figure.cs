@@ -10,13 +10,8 @@ public abstract class Figure
     public Color BorderColor { get; set; } = Color.White;
     public Color FillColor { get; set; } = Color.FromArgb(128, Color.White);
     public bool IsSelected { get; set; }
-    public bool NeedXFlip { get; set; }
-    public bool NeedYFlip { get; set; }
-    public bool HasXFlipped { get; set; }
-    public bool HasYFlipped { get; set; }
-    public bool CanFlipX { get; set; } = true;
-    public bool CanFlipY { get; set; } = true;
-    
+    public bool HasFlipped { get; set; }
+    public ResizePosition PreviousResizePosition { get; set; }
     
     protected Figure(PointF[] points, PointF position, PointF pivotOffset, string name)
     {
@@ -117,6 +112,10 @@ public abstract class Figure
         flipMatrix.Scale(needsXFlip ? -1 : 1, needsYFlip ? -1 : 1);
         flipMatrix.Translate(-pivot.X, -pivot.Y);
         flipMatrix.TransformPoints(Points);
+        
+        var pivotPoints = new[] { _pivot };
+        flipMatrix.TransformPoints(pivotPoints);
+        _pivot = pivotPoints[0];
     }
     
     public virtual void Draw(Graphics g)

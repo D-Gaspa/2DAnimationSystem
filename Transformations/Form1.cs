@@ -568,6 +568,7 @@ public partial class Form1 : Form
                     figure.IsSelected = false;
                 }
                 figureToResize.IsSelected = true;
+                figureToResize.PreviousResizePosition = _currentResizePosition;
             }
 
             // Create a temporary list with the selected figure to be resized
@@ -833,9 +834,6 @@ public partial class Form1 : Form
 
         // Get a unique name for the figure
         var name = _canvas.GenerateUniqueFigureName(figureType);
-
-        // Create and add the figure
-        // TODO - ADD FILL AND BORDER COLORS
         
         CreateAndAddFigure(figureType, size, position, name, pivotOffset);
 
