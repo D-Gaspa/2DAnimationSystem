@@ -1,6 +1,8 @@
 ﻿namespace Transformations;
 internal sealed class Canvas
 {
+    // Border and Fill colors when adding figures are not being applied
+    
     public readonly List<Figure> Figures = [];
     public readonly List<PointF> CustomFigurePoints = [];
     public readonly Stack<CanvasOperation> UndoStack = new();

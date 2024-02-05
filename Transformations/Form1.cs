@@ -14,6 +14,7 @@ public partial class Form1 : Form
     private bool _isDragging;
     private bool _isTranslating;
     private bool _isResizing;
+    private RectangleF _originalBox;
     private Point _initialMousePosition;
     private Point _currentMousePosition;
     private List<Figure>? _tempSelectedFigures;
@@ -74,7 +75,7 @@ public partial class Form1 : Form
         figuresComboBox.Items.Add("Triangle");
 
         // Select the first figure type by default.
-        figuresComboBox.SelectedIndex = 0;
+        figuresComboBox.SelectedIndex = 1;
     }
     
     private void RenderFigures()
@@ -236,8 +237,9 @@ public partial class Form1 : Form
     {
         // Create a resize operation for each selected figure
         if (_tempSelectedFigures == null) return;
+        
         var operations = _tempSelectedFigures.Where(f => f.IsSelected)
-            .Select(figure => new ResizeFigureOperation(figure, _currentResizePosition, e.Location) { IsNewOperation = false })
+            .Select(figure => new ResizeFigureOperation(figure, _currentResizePosition, _originalBox, e.Location) { IsNewOperation = false })
             .Cast<CanvasOperation>().ToList();
         
         // Execute the batch operation
@@ -479,7 +481,7 @@ public partial class Form1 : Form
     {
         // Create a resize operation for each selected figure
         var operations = _canvas.Figures.Where(f => f.IsSelected)
-            .Select(figure => new ResizeFigureOperation(figure, _currentResizePosition, e.Location) { IsNewOperation = true })
+            .Select(figure => new ResizeFigureOperation(figure, _currentResizePosition, _originalBox, e.Location) { IsNewOperation = true })
             .Cast<CanvasOperation>().ToList();
         
         // Execute the batch operation and push it to the undo stack
@@ -558,7 +560,7 @@ public partial class Form1 : Form
         if (!isResizeCursor) return;
         {
             // If a resize operation is about to be performed, deselect all other figures and select the figure to be resized where the mouse is clicked.
-            var figureToResize = _canvas.Figures.FirstOrDefault(f => IsCursorAtSide(f.GetBounds(), e.Location));
+            var figureToResize = _canvas.Figures.FirstOrDefault(f => IsCursorAtSide(f.GetBounds(), e.Location) || IsCursorAtCorner(f.GetBounds(), e.Location));
             if (figureToResize != null)
             {
                 foreach (var figure in _canvas.Figures)
@@ -568,8 +570,11 @@ public partial class Form1 : Form
                 figureToResize.IsSelected = true;
             }
 
-            // Create a temporary list of selected figures
+            // Create a temporary list with the selected figure to be resized
             _tempSelectedFigures = _canvas.Figures.Where(f => f.IsSelected).Select(f => f.Clone()).ToList();
+
+            // Get the original bounding box of the figure
+            if (figureToResize != null) _originalBox = figureToResize.GetBounds();
 
             _isResizing = true;
         }
@@ -585,6 +590,9 @@ public partial class Form1 : Form
         if (_tempSelectedFigures == null) return;
         _tempSelectedFigures.Clear();
         _tempSelectedFigures = null;
+        
+        // Update the button states
+        UpdateAllButtonStates();
     }
     
     private void AddCustomFigureButton_Click(object? sender, EventArgs e)
@@ -805,7 +813,7 @@ public partial class Form1 : Form
     {
         if (fillColorDialog.ShowDialog() == DialogResult.OK)
         {
-            // Create a ChangeFillColorOperation
+            _fillColor = fillColorDialog.Color;
         }
     }
 
@@ -827,6 +835,8 @@ public partial class Form1 : Form
         var name = _canvas.GenerateUniqueFigureName(figureType);
 
         // Create and add the figure
+        // TODO - ADD FILL AND BORDER COLORS
+        
         CreateAndAddFigure(figureType, size, position, name, pivotOffset);
 
         // Update the button states and render the canvas
@@ -1079,6 +1089,16 @@ public partial class Form1 : Form
                 if (!_isAddCustomFigureModeActive)
                 {
                     selectAllCheckBox.Checked = false;
+                }
+                break;
+            case Keys.Control | Keys.R:
+                if (resetButton.Enabled && !_isAddCustomFigureModeActive)
+                {
+                    resetButton_Click(this, EventArgs.Empty);
+                }
+                if (resetCustomFigureButton.Enabled && _isAddCustomFigureModeActive)
+                {
+                    ResetCustomFigureButton_Click(this, EventArgs.Empty);
                 }
                 break;
         }
