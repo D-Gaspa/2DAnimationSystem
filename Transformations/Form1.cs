@@ -68,11 +68,6 @@ public partial class Form1 : Form
 
         // Select the first figure type by default.
         figuresComboBox.SelectedIndex = 0;
-        
-        // Set the default visibility of the controls.
-        borderColorSelectedButton.Visible = false;
-        fillColorSelectedButton.Visible = false;
-        duplicateButton.Visible = false;
     }
     
     private void RenderFigures()
@@ -126,15 +121,6 @@ public partial class Form1 : Form
 
     private void FiguresCheckedListBox_ItemCheck(object? sender, ItemCheckEventArgs e)
     {
-        // Delay the call to UpdateButtonStates until after the check state has been updated
-        BeginInvoke(UpdateButtonStates);
-
-        // Delay the call to UpdateSelectAllCheckBox until after the check state has been updated
-        BeginInvoke(UpdateSelectAllCheckBox);
-        
-        // Disable the addFigureCheckBox
-        addFigureCheckBox.Checked = false;
-
         // Get the figure name
         var figureName = figuresCheckedListBox.Items[e.Index].ToString();
         if (figureName == null) return;
@@ -145,6 +131,9 @@ public partial class Form1 : Form
 
         // Select or deselect the figure based on the new check state
         figure.IsSelected = e.NewValue == CheckState.Checked;
+        
+        // Update the check state
+        UpdateSelectAllCheckBox();
 
         // Render the canvas
         RenderFigures();
@@ -448,6 +437,9 @@ public partial class Form1 : Form
         }
         
         HandleFigureSelection(e);
+        
+        // Update the button states
+        UpdateButtonStates();
     }
     
     private void HandleCustomFigureCreationOnClick(MouseEventArgs e)
@@ -615,15 +607,20 @@ public partial class Form1 : Form
     {
         figure.IsSelected = isSelected;
 
-        // Find the corresponding checkbox and update its checked state
-        var index = figuresCheckedListBox.Items.IndexOf(figure.Name);
+        // Find the corresponding item in FiguresCheckBoxList and update its checked state
+        FindCorrectItem(figure.Name, isSelected);
+        
+        // Update button visibility
+        UpdateButtonVisibilityBasedOnSelection();
+    }
+    
+    private void FindCorrectItem(string name, bool isSelected)
+    {
+        var index = figuresCheckedListBox.Items.IndexOf(name);
         if (index != -1)
         {
             figuresCheckedListBox.SetItemChecked(index, isSelected);
         }
-        
-        // Update button visibility
-        UpdateButtonVisibilityBasedOnSelection();
     }
     
     private void PictureBox1_MouseDown(object? sender, MouseEventArgs e)
@@ -807,7 +804,23 @@ public partial class Form1 : Form
 
     private void OnFigureAdded(Figure figure)
     {
-        AddFigureToCheckedListBox(figure.Name);
+        UpdateCheckedListBox(() =>
+        {
+            // Deselect all other items in the figuresCheckedListBox
+            for (var i = 0; i < figuresCheckedListBox.Items.Count; i++)
+            {
+                figuresCheckedListBox.SetItemChecked(i, false);
+            }
+
+            // Add the figure to the CheckedListBox and set it as checked
+            figuresCheckedListBox.Items.Add(figure.Name, true);
+        });
+
+        // Select the figure
+        figure.IsSelected = true;
+
+        // Update the button visibility
+        UpdateButtonVisibilityBasedOnSelection();
     }
 
     private void OnFigureRemoved(Figure figure)
@@ -1015,6 +1028,13 @@ public partial class Form1 : Form
         // Execute the operation and push it to the undo stack
         addOperation.Execute(_canvas);
         _canvas.UndoStack.Push(addOperation);
+        
+        // Deselect all figures but the new one
+        foreach (var figure in _canvas.Figures)
+        {
+            figure.IsSelected = false;
+        }
+        newFigure.IsSelected = true;
     }
 
     private static Figure CreateFigure(string figureType, double size, PointF position, string name, PointF pivotOffset)
@@ -1027,17 +1047,58 @@ public partial class Form1 : Form
         };
     }
 
-    private void AddFigureToCheckedListBox(string name)
+    private void UpdateCheckedListBox(Action action)
     {
-        figuresCheckedListBox.Items.Add(name, false); // Add to CheckedListBox and set as unchecked
+        // Temporarily unsubscribe the ItemCheck event
+        figuresCheckedListBox.ItemCheck -= FiguresCheckedListBox_ItemCheck;
+
+        // Perform the action
+        action();
+
+        // Resubscribe the ItemCheck event
+        figuresCheckedListBox.ItemCheck += FiguresCheckedListBox_ItemCheck;
+    }
+    
+    private void UpdateSelectAllCheckBox(Action action)
+    {
+        // Temporarily unsubscribe the CheckedChanged event
+        selectAllCheckBox.CheckedChanged -= SelectAllCheckBox_CheckedChanged;
+
+        // Perform the action
+        action();
+
+        // Resubscribe the CheckedChanged event
+        selectAllCheckBox.CheckedChanged += SelectAllCheckBox_CheckedChanged;
     }
 
-    private void selectAllCheckBox_CheckedChanged(object sender, EventArgs e)
+    private void SelectAllCheckBox_CheckedChanged(object? sender, EventArgs e)
     {
-        for (var i = 0; i < figuresCheckedListBox.Items.Count; i++)
+        // Get the new check state
+        var newCheckState = selectAllCheckBox.Checked ? CheckState.Checked : CheckState.Unchecked;
+
+        UpdateCheckedListBox(() =>
         {
-            figuresCheckedListBox.SetItemChecked(i, selectAllCheckBox.Checked);
+            // Update the check state of all items in the figuresCheckedListBox
+            for (var i = 0; i < figuresCheckedListBox.Items.Count; i++)
+            {
+                figuresCheckedListBox.SetItemCheckState(i, newCheckState);
+            }
+        });
+
+        // Select or deselect all figures based on the new check state
+        foreach (var figure in _canvas.Figures)
+        {
+            figure.IsSelected = newCheckState == CheckState.Checked;
         }
+
+        // Render the figures
+        RenderFigures();
+        
+        // Update the button states
+        UpdateButtonStates();
+        
+        // Update the button visibility
+        UpdateButtonVisibilityBasedOnSelection();
     }
 
     private void DeleteButton_Click(object sender, EventArgs e)
@@ -1055,6 +1116,7 @@ public partial class Form1 : Form
         // Render the canvas
         RenderFigures();
         UpdateButtonStates();
+        UpdateButtonVisibilityBasedOnSelection();
 
         // Check if all items are deleted and uncheck the selectAllCheckBox
         if (_canvas.Figures.Count == 0)
@@ -1069,9 +1131,10 @@ public partial class Form1 : Form
         UpdateAllButtonStates();
         foreach (var figure in _canvas.Figures)
         {
-            figure.IsSelected = false;
+            SetFigureSelection(figure, false);
         }
         RenderFigures();
+        selectAllCheckBox.Checked = false;
     }
 
     private void RedoButton_Click(object sender, EventArgs e)
@@ -1080,9 +1143,10 @@ public partial class Form1 : Form
         UpdateAllButtonStates();
         foreach (var figure in _canvas.Figures)
         {
-            figure.IsSelected = false;
+            SetFigureSelection(figure, false);
         }
         RenderFigures();
+        selectAllCheckBox.Checked = false;
     }
     
     private void UndoCustomFigureButton_Click(object sender, EventArgs e)
@@ -1166,10 +1230,25 @@ public partial class Form1 : Form
         var batchOperation = new BatchCanvasOperation(operations);
         batchOperation.Execute(_canvas);
         _canvas.UndoStack.Push(batchOperation);
+        
+        UpdateCheckedListBox(() =>
+        {
+            // For all figures, update the item checked state
+            foreach (var figure in _canvas.Figures)
+            {
+                FindCorrectItem(figure.Name, figure.IsSelected);
+            }
+        });
+        
+        UpdateSelectAllCheckBox(() =>
+        {
+            // Update the selectAllCheckBox
+            selectAllCheckBox.Checked = false;
+        });
 
-        // Render the figures
         RenderFigures();
         UpdateButtonStates();
+        UpdateButtonVisibilityBasedOnSelection();
     }
     
     private void UpdateButtonVisibilityBasedOnSelection()
@@ -1231,16 +1310,12 @@ public partial class Form1 : Form
                 }
                 break;
             case Keys.Left:
-                TranslateSelectedFigures(-10, 0);
                 break;
             case Keys.Right:
-                TranslateSelectedFigures(10, 0);
                 break;
             case Keys.Up:
-                TranslateSelectedFigures(0, -10);
                 break;
             case Keys.Down:
-                TranslateSelectedFigures(0, 10);
                 break;
             case Keys.Back:
                 if (deleteButton.Enabled)
@@ -1285,6 +1360,9 @@ public partial class Form1 : Form
                     
                     // Update the button visibility
                     UpdateButtonVisibilityBasedOnSelection();
+                    
+                    // Update the button states
+                    UpdateButtonStates();
                 }
                 break;
             case Keys.Control | Keys.Shift | Keys.A:
@@ -1294,6 +1372,9 @@ public partial class Form1 : Form
                     
                     // Update the button visibility
                     UpdateButtonVisibilityBasedOnSelection();
+                    
+                    // Update the button states
+                    UpdateButtonStates();
                 }
                 break;
             case Keys.Control | Keys.R:
@@ -1317,18 +1398,13 @@ public partial class Form1 : Form
         return base.ProcessCmdKey(ref msg, keyData);
     }
 
-    private void TranslateSelectedFigures(int dx, int dy)
+    private void timeLinePictureBox_Click(object sender, EventArgs e)
     {
-        // Create a translation operation for each selected figure
-        var operations = _canvas.Figures.Where(f => f.IsSelected)
-            .Select(figure => new TranslateFigureOperation(figure, dx, dy) {IsNewOperation = true}).Cast<CanvasOperation>().ToList();
-        
-        // Execute the batch operation and push it to the undo stack
-        var batchOperation = new BatchCanvasOperation(operations);
-        batchOperation.Execute(_canvas);
-        _canvas.UndoStack.Push(batchOperation);
 
-        // Render the figures
-        RenderFigures();
+    }
+
+    private void addTimeLineButton_Click(object sender, EventArgs e)
+    {
+
     }
 }

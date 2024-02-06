@@ -63,13 +63,22 @@
             fillColorSelectedButton = new Button();
             borderColorSelectedButton = new Button();
             duplicateButton = new Button();
+            timeLinePictureBox = new PictureBox();
+            addTimeLineButton = new Button();
+            colorDialog1 = new ColorDialog();
+            resetTimeLineButton = new Button();
+            playTimeLineButton = new Button();
+            customTimeLineDurationCheckBox = new CheckBox();
+            customTimeLineDurationLabel = new Label();
+            customTimeLineDurationTextBox = new TextBox();
             ((System.ComponentModel.ISupportInitialize)pictureBox1).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)timeLinePictureBox).BeginInit();
             SuspendLayout();
             // 
             // pictureBox1
             // 
             pictureBox1.BackColor = SystemColors.ActiveCaptionText;
-            pictureBox1.BorderStyle = BorderStyle.Fixed3D;
+            pictureBox1.BorderStyle = BorderStyle.FixedSingle;
             pictureBox1.Location = new Point(12, 37);
             pictureBox1.Name = "pictureBox1";
             pictureBox1.Size = new Size(1178, 711);
@@ -282,7 +291,7 @@
             selectAllCheckBox.TabIndex = 30;
             selectAllCheckBox.Text = "Select All";
             selectAllCheckBox.UseVisualStyleBackColor = true;
-            selectAllCheckBox.CheckedChanged += selectAllCheckBox_CheckedChanged;
+            selectAllCheckBox.CheckedChanged += SelectAllCheckBox_CheckedChanged;
             // 
             // borderColorButton
             // 
@@ -451,12 +460,13 @@
             fillColorSelectedButton.Cursor = Cursors.Hand;
             fillColorSelectedButton.Font = new Font("Segoe UI Black", 7F);
             fillColorSelectedButton.ForeColor = SystemColors.Control;
-            fillColorSelectedButton.Location = new Point(1217, 128);
+            fillColorSelectedButton.Location = new Point(910, 6);
             fillColorSelectedButton.Name = "fillColorSelectedButton";
             fillColorSelectedButton.Size = new Size(123, 30);
             fillColorSelectedButton.TabIndex = 45;
             fillColorSelectedButton.Text = "FILL COLOR";
             fillColorSelectedButton.UseVisualStyleBackColor = false;
+            fillColorSelectedButton.Visible = false;
             fillColorSelectedButton.Click += fillColorSelectedButton_Click;
             // 
             // borderColorSelectedButton
@@ -465,12 +475,13 @@
             borderColorSelectedButton.Cursor = Cursors.Hand;
             borderColorSelectedButton.Font = new Font("Segoe UI Black", 7F);
             borderColorSelectedButton.ForeColor = SystemColors.Control;
-            borderColorSelectedButton.Location = new Point(1217, 92);
+            borderColorSelectedButton.Location = new Point(781, 6);
             borderColorSelectedButton.Name = "borderColorSelectedButton";
             borderColorSelectedButton.Size = new Size(123, 30);
             borderColorSelectedButton.TabIndex = 44;
             borderColorSelectedButton.Text = "BORDER COLOR";
             borderColorSelectedButton.UseVisualStyleBackColor = false;
+            borderColorSelectedButton.Visible = false;
             borderColorSelectedButton.Click += borderColorSelectedButton_Click;
             // 
             // duplicateButton
@@ -479,13 +490,99 @@
             duplicateButton.Cursor = Cursors.Hand;
             duplicateButton.Font = new Font("Segoe UI Black", 9F);
             duplicateButton.ForeColor = SystemColors.Control;
-            duplicateButton.Location = new Point(1201, 167);
+            duplicateButton.Location = new Point(1039, 6);
             duplicateButton.Name = "duplicateButton";
             duplicateButton.Size = new Size(151, 30);
             duplicateButton.TabIndex = 43;
             duplicateButton.Text = "DUPLICATE";
             duplicateButton.UseVisualStyleBackColor = false;
+            duplicateButton.Visible = false;
             duplicateButton.Click += DuplicateButton_Click;
+            // 
+            // timeLinePictureBox
+            // 
+            timeLinePictureBox.BackColor = Color.FromArgb(40, 40, 40);
+            timeLinePictureBox.BorderStyle = BorderStyle.FixedSingle;
+            timeLinePictureBox.Location = new Point(172, 759);
+            timeLinePictureBox.Name = "timeLinePictureBox";
+            timeLinePictureBox.Size = new Size(1180, 75);
+            timeLinePictureBox.TabIndex = 46;
+            timeLinePictureBox.TabStop = false;
+            timeLinePictureBox.Visible = false;
+            timeLinePictureBox.Click += timeLinePictureBox_Click;
+            // 
+            // addTimeLineButton
+            // 
+            addTimeLineButton.BackColor = Color.MidnightBlue;
+            addTimeLineButton.Cursor = Cursors.Hand;
+            addTimeLineButton.Font = new Font("Segoe UI Black", 9F);
+            addTimeLineButton.ForeColor = SystemColors.Control;
+            addTimeLineButton.Location = new Point(12, 754);
+            addTimeLineButton.Name = "addTimeLineButton";
+            addTimeLineButton.Size = new Size(151, 30);
+            addTimeLineButton.TabIndex = 49;
+            addTimeLineButton.Text = "ADD TIMELINE";
+            addTimeLineButton.UseVisualStyleBackColor = false;
+            addTimeLineButton.Click += addTimeLineButton_Click;
+            // 
+            // resetTimeLineButton
+            // 
+            resetTimeLineButton.BackColor = Color.DarkGreen;
+            resetTimeLineButton.Cursor = Cursors.Hand;
+            resetTimeLineButton.Font = new Font("Segoe UI Black", 9F);
+            resetTimeLineButton.ForeColor = SystemColors.Control;
+            resetTimeLineButton.Location = new Point(12, 789);
+            resetTimeLineButton.Name = "resetTimeLineButton";
+            resetTimeLineButton.Size = new Size(150, 30);
+            resetTimeLineButton.TabIndex = 52;
+            resetTimeLineButton.Text = "RESET TIMELINE";
+            resetTimeLineButton.UseVisualStyleBackColor = false;
+            resetTimeLineButton.Visible = false;
+            // 
+            // playTimeLineButton
+            // 
+            playTimeLineButton.BackColor = Color.MidnightBlue;
+            playTimeLineButton.Cursor = Cursors.Hand;
+            playTimeLineButton.Font = new Font("Segoe UI Black", 9F);
+            playTimeLineButton.ForeColor = SystemColors.Control;
+            playTimeLineButton.Location = new Point(12, 754);
+            playTimeLineButton.Name = "playTimeLineButton";
+            playTimeLineButton.Size = new Size(151, 30);
+            playTimeLineButton.TabIndex = 53;
+            playTimeLineButton.Text = "PLAY TIMELINE";
+            playTimeLineButton.UseVisualStyleBackColor = false;
+            playTimeLineButton.Visible = false;
+            // 
+            // customTimeLineDurationCheckBox
+            // 
+            customTimeLineDurationCheckBox.AutoSize = true;
+            customTimeLineDurationCheckBox.Cursor = Cursors.Hand;
+            customTimeLineDurationCheckBox.Location = new Point(175, 757);
+            customTimeLineDurationCheckBox.Name = "customTimeLineDurationCheckBox";
+            customTimeLineDurationCheckBox.Size = new Size(288, 24);
+            customTimeLineDurationCheckBox.TabIndex = 54;
+            customTimeLineDurationCheckBox.Text = "Custom TimeLine Duration (Default 3s)";
+            customTimeLineDurationCheckBox.UseVisualStyleBackColor = true;
+            // 
+            // customTimeLineDurationLabel
+            // 
+            customTimeLineDurationLabel.AutoSize = true;
+            customTimeLineDurationLabel.Location = new Point(475, 758);
+            customTimeLineDurationLabel.Name = "customTimeLineDurationLabel";
+            customTimeLineDurationLabel.Size = new Size(154, 20);
+            customTimeLineDurationLabel.TabIndex = 47;
+            customTimeLineDurationLabel.Text = "TimeLine Duration (s):";
+            customTimeLineDurationLabel.Visible = false;
+            // 
+            // customTimeLineDurationTextBox
+            // 
+            customTimeLineDurationTextBox.BackColor = Color.DimGray;
+            customTimeLineDurationTextBox.BorderStyle = BorderStyle.FixedSingle;
+            customTimeLineDurationTextBox.Location = new Point(635, 756);
+            customTimeLineDurationTextBox.Name = "customTimeLineDurationTextBox";
+            customTimeLineDurationTextBox.Size = new Size(77, 27);
+            customTimeLineDurationTextBox.TabIndex = 48;
+            customTimeLineDurationTextBox.Visible = false;
             // 
             // Form1
             // 
@@ -494,7 +591,14 @@
             AutoSize = true;
             AutoSizeMode = AutoSizeMode.GrowAndShrink;
             BackColor = Color.FromArgb(64, 64, 64);
-            ClientSize = new Size(1362, 756);
+            ClientSize = new Size(1362, 869);
+            Controls.Add(customTimeLineDurationCheckBox);
+            Controls.Add(playTimeLineButton);
+            Controls.Add(resetTimeLineButton);
+            Controls.Add(addTimeLineButton);
+            Controls.Add(customTimeLineDurationTextBox);
+            Controls.Add(customTimeLineDurationLabel);
+            Controls.Add(timeLinePictureBox);
             Controls.Add(fillColorSelectedButton);
             Controls.Add(borderColorSelectedButton);
             Controls.Add(duplicateButton);
@@ -534,6 +638,7 @@
             Text = "Form1";
             Load += Form1_Load;
             ((System.ComponentModel.ISupportInitialize)pictureBox1).EndInit();
+            ((System.ComponentModel.ISupportInitialize)timeLinePictureBox).EndInit();
             ResumeLayout(false);
             PerformLayout();
         }
@@ -575,5 +680,13 @@
         private Button fillColorSelectedButton;
         private Button borderColorSelectedButton;
         private Button duplicateButton;
+        private PictureBox timeLinePictureBox;
+        private Button addTimeLineButton;
+        private ColorDialog colorDialog1;
+        private Button resetTimeLineButton;
+        private Button playTimeLineButton;
+        private CheckBox customTimeLineDurationCheckBox;
+        private Label customTimeLineDurationLabel;
+        private TextBox customTimeLineDurationTextBox;
     }
 }
