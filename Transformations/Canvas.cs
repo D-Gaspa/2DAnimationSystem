@@ -1,6 +1,8 @@
 ﻿namespace Transformations;
 internal sealed class Canvas
 {
+    // TODO: If enough time, add selection box when dragging the mouse and when the mouse is released, select all figures inside the box
+    
     public readonly List<Figure> Figures = [];
     public readonly List<PointF> CustomFigurePoints = [];
     public readonly Stack<CanvasOperation> UndoStack = new();
