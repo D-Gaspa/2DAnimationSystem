@@ -1,7 +1,7 @@
 namespace Transformations;
 public partial class Form1 : Form
 {
-    private TimeLine _timeLine = null!;
+    private TimeLine? _timeLine;
     private UnfinishedCustomFigure _unfinishedCustomFigure = null!;
     private readonly Canvas _canvas;
     private readonly Graphics _g;
@@ -27,9 +27,9 @@ public partial class Form1 : Form
     {
         // Initialize components and set up the drawing environment.
         InitializeComponent();
-        var bmp = new Bitmap(pictureBox1.Width, pictureBox1.Height);
+        var bmp = new Bitmap(canvasPictureBox.Width, canvasPictureBox.Height);
         _g = Graphics.FromImage(bmp);
-        pictureBox1.Image = bmp;
+        canvasPictureBox.Image = bmp;
 
         var timeLineBmp = new Bitmap(timeLinePictureBox.Width, timeLinePictureBox.Height);
         _timeLineGraphics = Graphics.FromImage(timeLineBmp);
@@ -47,7 +47,7 @@ public partial class Form1 : Form
         UpdateAllButtonStates();
 
         // Render the canvas.
-        Canvas.Render(_g, pictureBox1);
+        Canvas.Render(_g, canvasPictureBox);
     }
 
     private void SubscribeToEvents()
@@ -76,10 +76,10 @@ public partial class Form1 : Form
         // Select the first figure type by default.
         figuresComboBox.SelectedIndex = 0;
     }
-    
-    private void RenderFigures()
+
+    public void RenderFigures()
     {
-        Canvas.Render(_g, pictureBox1);
+        Canvas.Render(_g, canvasPictureBox);
         _canvas.RenderFigures(_g);
     }
     
@@ -109,10 +109,10 @@ public partial class Form1 : Form
         SetControlVisibility(visibleControls, !_isAddCustomFigureModeActive);
         
         // Change the cursor based on the state of the addCustomFigureCheckBox.
-        pictureBox1.Cursor = _isAddCustomFigureModeActive ? Cursors.Cross : Cursors.Default;
+        canvasPictureBox.Cursor = _isAddCustomFigureModeActive ? Cursors.Cross : Cursors.Default;
 
         // Change the background color based on the state of the addCustomFigureCheckBox.
-        BackColor = _isAddCustomFigureModeActive ? Color.Black : Color.FromArgb(64, 64, 64);
+        BackColor = _isAddCustomFigureModeActive ? Color.Black : Color.FromArgb(10,10, 20);
         
         DisableFigureSelection();
         UpdateAllButtonStates();
@@ -155,7 +155,7 @@ public partial class Form1 : Form
         selectAllCheckBox.Checked = allChecked;
     }
     
-    private void PictureBox1_MouseMove(object? sender, MouseEventArgs e)
+    private void CanvasPictureBoxMouseMove(object? sender, MouseEventArgs e)
     {
         UpdateCoordinatesLabel(e);
         
@@ -163,7 +163,7 @@ public partial class Form1 : Form
         var selectedFigures = _canvas.Figures.Where(f => f.IsSelected).ToList();
         if (selectedFigures.Count == 0)
         {
-            pictureBox1.Cursor = Cursors.Default;
+            canvasPictureBox.Cursor = Cursors.Default;
             return;
         }
         
@@ -201,7 +201,7 @@ public partial class Form1 : Form
         batchOperation.Execute(_canvas);
         
         // Render the canvas
-        Canvas.Render(_g, pictureBox1);
+        Canvas.Render(_g, canvasPictureBox);
         
         // Render all figures that are not selected (in the background)
         foreach (var figure in _canvas.Figures.Where(f => !f.IsSelected))
@@ -247,7 +247,7 @@ public partial class Form1 : Form
         _currentMouseLocation = e.Location;
 
         // Render the canvas
-        Canvas.Render(_g, pictureBox1);
+        Canvas.Render(_g, canvasPictureBox);
             
         // Render all figures that are not selected (in the background)
         foreach (var figure in _canvas.Figures.Where(f => !f.IsSelected))
@@ -276,7 +276,7 @@ public partial class Form1 : Form
         batchOperation.Execute(_canvas);
         
         // Render the canvas
-        Canvas.Render(_g, pictureBox1);
+        Canvas.Render(_g, canvasPictureBox);
         
         // Render all figures that are not selected (in the background)
         foreach (var figure in _canvas.Figures.Where(f => !f.IsSelected))
@@ -298,31 +298,31 @@ public partial class Form1 : Form
             // Check if the cursor is near the pivot point
             if (IsCursorAtPivot(figure, e.Location))
             {
-                pictureBox1.Cursor = Cursors.Hand;
+                canvasPictureBox.Cursor = Cursors.Hand;
                 return;
             }
 
             // Check if the cursor is inside the figure
             if (figure.IsInsideFigure(e.Location))
             {
-                pictureBox1.Cursor = Cursors.SizeAll;
+                canvasPictureBox.Cursor = Cursors.SizeAll;
                 return;
             }
 
             if (IsCursorAtCorner(figure.GetBounds(), e.Location))
             {
                 // Change the cursor based on its position relative to the figure's bounding rectangle
-                pictureBox1.Cursor = GetCursorForCorner(figure.GetBounds(), e.Location);
+                canvasPictureBox.Cursor = GetCursorForCorner(figure.GetBounds(), e.Location);
                 return;
             }
 
             if (!IsCursorAtSide(figure.GetBounds(), e.Location)) continue;
             // Change the cursor based on its position relative to the figure's bounding rectangle
-            pictureBox1.Cursor = GetCursorForSide(figure.GetBounds(), e.Location);
+            canvasPictureBox.Cursor = GetCursorForSide(figure.GetBounds(), e.Location);
             return;
         }
 
-        pictureBox1.Cursor = Cursors.Default;
+        canvasPictureBox.Cursor = Cursors.Default;
     }
 
     private static bool IsCursorAtPivot(Figure figure, PointF point)
@@ -424,7 +424,7 @@ public partial class Form1 : Form
 
     }
     
-    private void PictureBox1_Click(object? sender, MouseEventArgs e)
+    private void CanvasPictureBoxClick(object? sender, MouseEventArgs e)
     {
         if (_isAddCustomFigureModeActive)
         {
@@ -484,7 +484,7 @@ public partial class Form1 : Form
 
         // Update the button states and refresh the picture box.
         UpdateCustomFigureButtonStates();
-        pictureBox1.Refresh();
+        canvasPictureBox.Refresh();
     }
     
     private void HandlePivotDragOnClick(MouseEventArgs e)
@@ -508,12 +508,12 @@ public partial class Form1 : Form
     
     private void HandleFigureDragOnClick(MouseEventArgs e)
     {
-        if (pictureBox1.Cursor == Cursors.SizeAll)
+        if (canvasPictureBox.Cursor == Cursors.SizeAll)
         {
             TranslateSelectedFigures(e);
         }
 
-        else if (pictureBox1.Cursor != Cursors.Default)
+        else if (canvasPictureBox.Cursor != Cursors.Default)
         {
             ResizeSelectedFigures(e);
         }
@@ -630,14 +630,14 @@ public partial class Form1 : Form
         }
     }
     
-    private void PictureBox1_MouseDown(object? sender, MouseEventArgs e)
+    private void CanvasPictureBoxMouseDown(object? sender, MouseEventArgs e)
     {
         // Check if the cursor is not default or if no figure is selected
-        if (pictureBox1.Cursor == Cursors.Default || !_canvas.Figures.Any(f => f.IsSelected))
+        if (canvasPictureBox.Cursor == Cursors.Default || !_canvas.Figures.Any(f => f.IsSelected))
             return;
 
         // Check if we are dragging the pivot
-        if (pictureBox1.Cursor == Cursors.Hand)
+        if (canvasPictureBox.Cursor == Cursors.Hand)
         {
             // If a pivot dragging operation is about to be performed, deselect all other figures and select the one that is being operated on
             var figureToOperateOn = _canvas.Figures.FirstOrDefault(f => IsCursorAtPivot(f, e.Location));
@@ -665,7 +665,7 @@ public partial class Form1 : Form
         _currentMouseLocation = e.Location;
 
         // Check if we have a translation operation
-        if (pictureBox1.Cursor == Cursors.SizeAll)
+        if (canvasPictureBox.Cursor == Cursors.SizeAll)
         {
             _isTranslating = true;
             
@@ -675,8 +675,8 @@ public partial class Form1 : Form
             return;
         }
 
-        var isResizeCursor = pictureBox1.Cursor == Cursors.SizeWE || pictureBox1.Cursor == Cursors.SizeNS ||
-                             pictureBox1.Cursor == Cursors.SizeNWSE || pictureBox1.Cursor == Cursors.SizeNESW;
+        var isResizeCursor = canvasPictureBox.Cursor == Cursors.SizeWE || canvasPictureBox.Cursor == Cursors.SizeNS ||
+                             canvasPictureBox.Cursor == Cursors.SizeNWSE || canvasPictureBox.Cursor == Cursors.SizeNESW;
 
         // Check if we have a resize operation
         if (!isResizeCursor) return;
@@ -703,7 +703,7 @@ public partial class Form1 : Form
         }
     }
     
-    private void PictureBox1_MouseUp(object? sender, MouseEventArgs e)
+    private void CanvasPictureBoxMouseUp(object? sender, MouseEventArgs e)
     {
         _isDraggingPivot = false;
         _isDragging = false;
@@ -714,9 +714,6 @@ public partial class Form1 : Form
         if (_tempSelectedFigures == null) return;
         _tempSelectedFigures.Clear();
         _tempSelectedFigures = null;
-        
-        //RenderFigures();
-        // TODO
         
         // Update the button states
         UpdateAllButtonStates();
@@ -1144,7 +1141,11 @@ public partial class Form1 : Form
             SetFigureSelection(figure, false);
         }
         RenderFigures();
+
+        _timeLine?.Draw();
+
         selectAllCheckBox.Checked = false;
+        UpdateTimeLineButtonStates();
     }
 
     private void RedoButton_Click(object sender, EventArgs e)
@@ -1155,8 +1156,12 @@ public partial class Form1 : Form
             SetFigureSelection(figure, false);
         }
         RenderFigures();
+        
+        _timeLine?.Draw();
+        
         selectAllCheckBox.Checked = false;
         UpdateAllButtonStates();
+        UpdateTimeLineButtonStates();
     }
     
     private void UndoCustomFigureButton_Click(object sender, EventArgs e)
@@ -1175,9 +1180,14 @@ public partial class Form1 : Form
     private void resetButton_Click(object sender, EventArgs e)
     {
         _canvas.Reset();
+        
+        _timeLine?.Reset();
+        
         figuresCheckedListBox.Items.Clear();
+        
         // Restore the default border and fill colors
         RestoreDefaultColors();
+        
         // Render the figures
         RenderFigures();
         UpdateButtonStates();
@@ -1271,11 +1281,13 @@ public partial class Form1 : Form
         borderColorSelectedButton.Visible = isAnyFigureSelected;
         fillColorSelectedButton.Visible = isAnyFigureSelected;
     }
-    
-    private void UpdateAllButtonStates()
+
+    public void UpdateAllButtonStates()
     {
         UpdateButtonStates();
         UpdateCustomFigureButtonStates();
+        UpdateButtonVisibilityBasedOnSelection();
+        UpdateTimeLineButtonStates();
     }
     
     private void UpdateCustomFigureButtonStates()
@@ -1287,13 +1299,14 @@ public partial class Form1 : Form
         UpdateButtonState(borderColorCustomFigureButton, _canvas.CustomFigurePoints.Count > 1, Color.SteelBlue, DefaultBackColor);
         UpdateButtonState(fillColorCustomFigureButton, _canvas.CustomFigurePoints.Count > 2, Color.SteelBlue, DefaultBackColor);
     }
-    
-    private void UpdateTimeLineButtonStates()
+
+    public void UpdateTimeLineButtonStates()
     {
-        UpdateButtonState(resetTimeLineButton, _timeLine.CanReset(), Color.DarkGreen, DefaultBackColor);
+        UpdateButtonState(resetTimeLineButton, _timeLine != null && _timeLine.CanReset(), Color.DarkGreen, DefaultBackColor);
+        UpdateButtonState(playTimeLineButton, _timeLine != null && _timeLine.CanPlay(), Color.MidnightBlue, DefaultBackColor);
     }
 
-    private void UpdateButtonStates()
+    public void UpdateButtonStates()
     {
         UpdateButtonState(undoButton, _canvas.CanUndo(), Color.Green, DefaultBackColor);
         UpdateButtonState(redoButton, _canvas.CanRedo(), Color.Green, DefaultBackColor);
@@ -1305,6 +1318,31 @@ public partial class Form1 : Form
     {
         button.Enabled = condition;
         button.BackColor = condition ? enabledColor : disabledColor;
+    }
+    
+    public void DisableButtons()
+    {
+        DisableButton(undoButton);
+        DisableButton(redoButton);
+        DisableButton(deleteButton);
+        DisableButton(resetButton);
+        DisableButton(borderColorButton);
+        DisableButton(fillColorButton);
+        DisableButton(addCustomFigureButton);
+        DisableButton(resetCustomFigureButton);
+        DisableButton(undoCustomFigureButton);
+        DisableButton(redoCustomFigureButton);
+        DisableButton(borderColorCustomFigureButton);
+        DisableButton(fillColorCustomFigureButton);
+        DisableButton(addFigureButton);
+        DisableButton(playTimeLineButton);
+        DisableButton(resetTimeLineButton);
+    }
+
+    private static void DisableButton(Control button)
+    {
+        button.Enabled = false;
+        button.BackColor = DefaultBackColor;
     }
     
     private void RestoreDefaultColors()
@@ -1342,7 +1380,9 @@ public partial class Form1 : Form
         addTimeLineButton.Visible = false;
         
         // Create a new TimeLine instance
-        _timeLine = new TimeLine(timeLinePictureBox, _timeLineGraphics, duration);
+        _timeLine = new TimeLine(timeLinePictureBox, _timeLineGraphics, _canvas, this, duration);
+        
+        _canvas.TimeLine = _timeLine;
         
         // Draw the timeline
         _timeLine.Draw();
@@ -1353,33 +1393,50 @@ public partial class Form1 : Form
     
     private void playTimeLineButton_Click(object sender, EventArgs e)
     {
-        _timeLine.Play();
+        addFigureCheckBox.Checked = false;
+        _isAddFigureModeActive = false;
+        _isAddCustomFigureModeActive = false;
+        
+        foreach (var figure in _canvas.Figures)
+        {
+            figure.IsSelected = false;
+        }
+        
+        // Uncheck all selected items in the figuresCheckedListBox
+        for (var i = 0; i < figuresCheckedListBox.Items.Count; i++)
+        {
+            figuresCheckedListBox.SetItemChecked(i, false);
+        }
+        
+        UpdateButtonVisibilityBasedOnSelection();
+        
+        _timeLine?.Play(_g, canvasPictureBox);
     }
     
     private void resetTimeLineButton_Click(object sender, EventArgs e)
     {
-        _timeLine.Reset();
+        _timeLine?.Reset();
         UpdateTimeLineButtonStates();
     }
     
     private void timeLinePictureBox_MouseMove(object sender, MouseEventArgs e)
     {
-        _timeLine.HandleMouseMove(e);
+        _timeLine?.HandleMouseMove(e);
     }
     
     private void timeLinePictureBox_Click(object sender, EventArgs e)
     {
-        _timeLine.HandleClick(e);
+        _timeLine?.HandleClick();
     }
     
     private void timeLinePictureBox_MouseDown(object sender, MouseEventArgs e)
     {
-        _timeLine.HandleMouseDown(e);
+        _timeLine?.HandleMouseDown();
     }
     
     private void timeLinePictureBox_MouseUp(object sender, MouseEventArgs e)
     {
-        _timeLine.HandleMouseUp(e);
+        _timeLine?.HandleMouseUp();
         UpdateTimeLineButtonStates();
     }
 
@@ -1400,13 +1457,13 @@ public partial class Form1 : Form
             case Keys.Left:
                 if (timeLinePictureBox.Visible)
                 {
-                    _timeLine.MoveCursorLeft();
+                    _timeLine?.MoveCursorLeft();
                 }
                 break;
             case Keys.Right:
                 if (timeLinePictureBox.Visible)
                 {
-                    _timeLine.MoveCursorRight();
+                    _timeLine?.MoveCursorRight();
                 }
                 break;
             case Keys.Up:
