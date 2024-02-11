@@ -28,7 +28,7 @@
         /// </summary>
         private void InitializeComponent()
         {
-            pictureBox1 = new PictureBox();
+            canvasPictureBox = new PictureBox();
             figuresCheckedListBox = new CheckedListBox();
             redoButton = new Button();
             undoButton = new Button();
@@ -70,23 +70,23 @@
             customTimeLineDurationCheckBox = new CheckBox();
             customTimeLineDurationLabel = new Label();
             customTimeLineDurationTextBox = new TextBox();
-            ((System.ComponentModel.ISupportInitialize)pictureBox1).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)canvasPictureBox).BeginInit();
             ((System.ComponentModel.ISupportInitialize)timeLinePictureBox).BeginInit();
             SuspendLayout();
             // 
             // pictureBox1
             // 
-            pictureBox1.BackColor = SystemColors.ActiveCaptionText;
-            pictureBox1.BorderStyle = BorderStyle.FixedSingle;
-            pictureBox1.Location = new Point(12, 37);
-            pictureBox1.Name = "pictureBox1";
-            pictureBox1.Size = new Size(1178, 711);
-            pictureBox1.TabIndex = 0;
-            pictureBox1.TabStop = false;
-            pictureBox1.MouseClick += PictureBox1_Click;
-            pictureBox1.MouseDown += PictureBox1_MouseDown;
-            pictureBox1.MouseMove += PictureBox1_MouseMove;
-            pictureBox1.MouseUp += PictureBox1_MouseUp;
+            canvasPictureBox.BackColor = SystemColors.ActiveCaptionText;
+            canvasPictureBox.BorderStyle = BorderStyle.FixedSingle;
+            canvasPictureBox.Location = new Point(12, 37);
+            canvasPictureBox.Name = "canvasPictureBox";
+            canvasPictureBox.Size = new Size(1178, 711);
+            canvasPictureBox.TabIndex = 0;
+            canvasPictureBox.TabStop = false;
+            canvasPictureBox.MouseClick += CanvasPictureBoxClick;
+            canvasPictureBox.MouseDown += CanvasPictureBoxMouseDown;
+            canvasPictureBox.MouseMove += CanvasPictureBoxMouseMove;
+            canvasPictureBox.MouseUp += CanvasPictureBoxMouseUp;
             // 
             // figuresCheckedListBox
             // 
@@ -596,7 +596,7 @@
             AutoScaleMode = AutoScaleMode.Font;
             AutoSize = true;
             AutoSizeMode = AutoSizeMode.GrowAndShrink;
-            BackColor = Color.FromArgb(64, 64, 64);
+            BackColor = Color.DarkSlateGray;
             ClientSize = new Size(1362, 869);
             Controls.Add(customTimeLineDurationCheckBox);
             Controls.Add(playTimeLineButton);
@@ -637,14 +637,14 @@
             Controls.Add(undoButton);
             Controls.Add(redoButton);
             Controls.Add(figuresCheckedListBox);
-            Controls.Add(pictureBox1);
+            Controls.Add(canvasPictureBox);
             DoubleBuffered = true;
             ForeColor = SystemColors.Control;
             Name = "Form1";
             StartPosition = FormStartPosition.CenterScreen;
             Text = "Form1";
             Load += Form1_Load;
-            ((System.ComponentModel.ISupportInitialize)pictureBox1).EndInit();
+            ((System.ComponentModel.ISupportInitialize)canvasPictureBox).EndInit();
             ((System.ComponentModel.ISupportInitialize)timeLinePictureBox).EndInit();
             ResumeLayout(false);
             PerformLayout();
@@ -652,7 +652,7 @@
 
         #endregion
 
-        private PictureBox pictureBox1;
+        private PictureBox canvasPictureBox;
         private CheckedListBox figuresCheckedListBox;
         private Button redoButton;
         private Button undoButton;

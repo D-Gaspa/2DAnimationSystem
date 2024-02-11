@@ -12,11 +12,19 @@ public enum ResizePosition
     BottomRight
 }
 
-internal abstract class CanvasOperation
+public abstract class CanvasOperation
 {
     public abstract void Execute(Canvas canvas);
     public abstract void Undo(Canvas canvas);
     public bool IsNewOperation { get; set; }
+    
+    protected void ClearRedoStackIfNewOperation(Stack<CanvasOperation> redoStack)
+    {
+        if (IsNewOperation)
+        {
+            redoStack.Clear();
+        }
+    }
 }
 
 internal class BatchCanvasOperation(List<CanvasOperation> operations) : CanvasOperation
@@ -44,6 +52,8 @@ internal class BatchCanvasOperation(List<CanvasOperation> operations) : CanvasOp
 
 internal class AddFigureOperation(Figure figure) : CanvasOperation
 {
+    private HandleKeyFrameOperation? _handleKeyFrameOperation;
+
     public override void Execute(Canvas canvas)
     {
         canvas.Figures.Add(figure);
@@ -55,11 +65,13 @@ internal class AddFigureOperation(Figure figure) : CanvasOperation
         
         canvas.OnFigureAdded(figure);
 
-        // Clear the redo stack only if it's a new operation
-        if (IsNewOperation)
+        if (canvas.TimeLine != null)
         {
-            canvas.RedoStack.Clear();
+            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures);
+            _handleKeyFrameOperation.Execute(canvas);
         }
+
+        ClearRedoStackIfNewOperation(canvas.RedoStack);
     }
 
     public override void Undo(Canvas canvas)
@@ -69,21 +81,27 @@ internal class AddFigureOperation(Figure figure) : CanvasOperation
             IsNewOperation = IsNewOperation
         };
         operation.Execute(canvas);
+
+        _handleKeyFrameOperation?.Undo(canvas);
     }
 }
 
 internal class DeleteFigureOperation(Figure figure) : CanvasOperation
 {
+    private HandleKeyFrameOperation? _handleKeyFrameOperation;
+
     public override void Execute(Canvas canvas)
     {
         canvas.Figures.Remove(figure);
         canvas.OnFigureRemoved(figure);
         
-        // Clear the redo stack only if it's a new operation
-        if (IsNewOperation)
+        if (canvas.TimeLine != null)
         {
-            canvas.RedoStack.Clear();
+            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures);
+            _handleKeyFrameOperation.Execute(canvas);
         }
+        
+        ClearRedoStackIfNewOperation(canvas.RedoStack);
     }
 
     public override void Undo(Canvas canvas)
@@ -93,6 +111,8 @@ internal class DeleteFigureOperation(Figure figure) : CanvasOperation
             IsNewOperation = IsNewOperation
         };
         operation.Execute(canvas);
+        
+        _handleKeyFrameOperation?.Undo(canvas);
     }
 }
 
@@ -103,15 +123,19 @@ internal abstract class TransformFigureOperation(Figure figure) : CanvasOperatio
 
 internal class RotateFigureOperation(Figure figure, double angle) : TransformFigureOperation(figure)
 {
+    private HandleKeyFrameOperation? _handleKeyFrameOperation;
+
     public override void Execute(Canvas canvas)
     {
         Figure.Rotate(angle);
         
-        // Clear the redo stack only if it's a new operation
-        if (IsNewOperation)
+        if (canvas.TimeLine != null)
         {
-            canvas.RedoStack.Clear();
+            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures);
+            _handleKeyFrameOperation.Execute(canvas);
         }
+        
+        ClearRedoStackIfNewOperation(canvas.RedoStack);
     }
 
     public override void Undo(Canvas canvas)
@@ -121,20 +145,26 @@ internal class RotateFigureOperation(Figure figure, double angle) : TransformFig
             IsNewOperation = IsNewOperation
         };
         operation.Execute(canvas);
+        
+        _handleKeyFrameOperation?.Undo(canvas);
     }
 }
 
 internal class TranslateFigureOperation(Figure figure, double dx, double dy) : TransformFigureOperation(figure)
 {
+    private HandleKeyFrameOperation? _handleKeyFrameOperation;
+    
     public override void Execute(Canvas canvas)
     {
         Figure.Translate(dx, dy);
         
-        // Clear the redo stack only if it's a new operation
-        if (IsNewOperation)
+        if (canvas.TimeLine != null)
         {
-            canvas.RedoStack.Clear();
+            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures);
+            _handleKeyFrameOperation.Execute(canvas);
         }
+        
+        ClearRedoStackIfNewOperation(canvas.RedoStack);
     }
 
     public override void Undo(Canvas canvas)
@@ -144,6 +174,8 @@ internal class TranslateFigureOperation(Figure figure, double dx, double dy) : T
             IsNewOperation = IsNewOperation
         };
         operation.Execute(canvas);
+        
+        _handleKeyFrameOperation?.Undo(canvas);
     }
 }
 
@@ -161,11 +193,7 @@ internal class AddUnfinishedCustomFigurePointOperation(UnfinishedCustomFigure fi
         
         canvas.CustomFigurePoints.Add(point);
         
-        // Clear the redo stack only if it's a new operation
-        if (IsNewOperation)
-        {
-            canvas.CustomFigureRedoStack.Clear();
-        }
+        ClearRedoStackIfNewOperation(canvas.CustomFigureRedoStack);
     }
 
     public override void Undo(Canvas canvas)
@@ -174,26 +202,32 @@ internal class AddUnfinishedCustomFigurePointOperation(UnfinishedCustomFigure fi
         
         canvas.CustomFigurePoints.RemoveAt(canvas.CustomFigurePoints.Count - 1);
         
-        // Clear the redo stack only if it's a new operation
-        if (IsNewOperation)
-        {
-            canvas.CustomFigureRedoStack.Clear();
-        }
+        ClearRedoStackIfNewOperation(canvas.CustomFigureRedoStack);
     }
 }
 
 internal class ChangeFillColorOperation(Figure figure, Color newColor) : CanvasOperation
 {
+    private HandleKeyFrameOperation? _handleKeyFrameOperation;
     private readonly Color _oldColor = figure.FillColor;
 
     public override void Execute(Canvas canvas)
     {
         figure.FillColor = newColor;
         
-        // Clear the redo stack only if it's a new operation
-        if (!IsNewOperation) return;
-        canvas.RedoStack.Clear();
-        canvas.CustomFigureRedoStack.Clear();
+        if (figure is UnfinishedCustomFigure)
+        {
+            ClearRedoStackIfNewOperation(canvas.CustomFigureRedoStack);
+            return;
+        }
+        
+        if (canvas.TimeLine != null)
+        {
+            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures);
+            _handleKeyFrameOperation.Execute(canvas);
+        }
+        
+        ClearRedoStackIfNewOperation(canvas.RedoStack);
     }
 
     public override void Undo(Canvas canvas)
@@ -203,21 +237,33 @@ internal class ChangeFillColorOperation(Figure figure, Color newColor) : CanvasO
             IsNewOperation = IsNewOperation
         };
         operation.Execute(canvas);
+        
+        _handleKeyFrameOperation?.Undo(canvas);
     }
 }
 
 internal class ChangeBorderColorOperation(Figure figure, Color newColor) : CanvasOperation
 {
+    private HandleKeyFrameOperation? _handleKeyFrameOperation;
     private readonly Color _oldColor = figure.BorderColor;
 
     public override void Execute(Canvas canvas)
     {
         figure.BorderColor = newColor;
         
-        // Clear the redo stack only if it's a new operation
-        if (!IsNewOperation) return;
-        canvas.RedoStack.Clear();
-        canvas.CustomFigureRedoStack.Clear();
+        if (figure is UnfinishedCustomFigure)
+        {
+            ClearRedoStackIfNewOperation(canvas.CustomFigureRedoStack);
+            return;
+        }
+        
+        if (canvas.TimeLine != null)
+        {
+            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures);
+            _handleKeyFrameOperation.Execute(canvas);
+        }
+        
+        ClearRedoStackIfNewOperation(canvas.RedoStack);
     }
 
     public override void Undo(Canvas canvas)
@@ -227,6 +273,8 @@ internal class ChangeBorderColorOperation(Figure figure, Color newColor) : Canva
             IsNewOperation = IsNewOperation
         };
         operation.Execute(canvas);
+        
+        _handleKeyFrameOperation?.Undo(canvas);
     }
 }
 
@@ -237,6 +285,7 @@ internal class ResizeFigureOperation(
     PointF newMousePosition)
     : CanvasOperation
 {
+    private HandleKeyFrameOperation? _handleKeyFrameOperation;
     private readonly RectangleF _oldBoundingBox = figure.GetBounds();
     private bool _needsXFlip;
     private bool _needsYFlip;
@@ -271,11 +320,13 @@ internal class ResizeFigureOperation(
 
         figure.PreviousResizePosition = currentResizePosition;
         
-        // Clear the redo stack only if it's a new operation
-        if (IsNewOperation)
+        if (canvas.TimeLine != null)
         {
-            canvas.RedoStack.Clear();
+            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures);
+            _handleKeyFrameOperation.Execute(canvas);
         }
+        
+        ClearRedoStackIfNewOperation(canvas.RedoStack);
     }
 
     public override void Undo(Canvas canvas)
@@ -293,13 +344,7 @@ internal class ResizeFigureOperation(
         var dx = _oldBoundingBox.X - figure.GetBounds().X;
         var dy = _oldBoundingBox.Y - figure.GetBounds().Y;
         figure.Translate(dx, dy);
-
-        // Clear the redo stack only if it's a new operation
-        if (IsNewOperation)
-        {
-            canvas.RedoStack.Clear();
-        }
-
+        
         // Reset the flip flags
         figure.HasFlipped = false;
         _wasFlippedX = false;
@@ -307,6 +352,10 @@ internal class ResizeFigureOperation(
         
         // Reset the previous resize position
         currentResizePosition = _previousResizePosition;
+        
+        _handleKeyFrameOperation?.Undo(canvas);
+        
+        ClearRedoStackIfNewOperation(canvas.RedoStack);
     }
 
     private RectangleF CalculateNewBoundingBox(RectangleF boundingBox)
@@ -633,11 +682,7 @@ internal class MovePivotOperation(Figure figure, PointF newPivot) : CanvasOperat
     {
         figure.Pivot = newPivot;
         
-        // Clear the redo stack only if it's a new operation
-        if (IsNewOperation)
-        {
-            canvas.RedoStack.Clear();
-        }
+        ClearRedoStackIfNewOperation(canvas.RedoStack);
     }
 
     public override void Undo(Canvas canvas)
@@ -652,6 +697,7 @@ internal class MovePivotOperation(Figure figure, PointF newPivot) : CanvasOperat
 
 internal class DuplicateFigureOperation(Figure figure, string duplicateFigureName) : CanvasOperation
 {
+    private HandleKeyFrameOperation? _handleKeyFrameOperation;
     private Figure? _duplicate;
 
     public override void Execute(Canvas canvas)
@@ -668,11 +714,13 @@ internal class DuplicateFigureOperation(Figure figure, string duplicateFigureNam
         canvas.Figures.Add(_duplicate);
         canvas.OnFigureAdded(_duplicate);
         
-        // Clear the redo stack only if it's a new operation
-        if (IsNewOperation)
+        if (canvas.TimeLine != null)
         {
-            canvas.RedoStack.Clear();
+            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures);
+            _handleKeyFrameOperation.Execute(canvas);
         }
+        
+        ClearRedoStackIfNewOperation(canvas.RedoStack);
     }
 
     public override void Undo(Canvas canvas)
@@ -682,5 +730,108 @@ internal class DuplicateFigureOperation(Figure figure, string duplicateFigureNam
             IsNewOperation = IsNewOperation
         };
         operation.Execute(canvas);
+        
+        _handleKeyFrameOperation?.Undo(canvas);
+    }
+}
+
+internal class AddKeyFrameOperation(KeyFrame? keyFrame, TimeLine timeLine) : CanvasOperation
+{
+    public override void Execute(Canvas canvas)
+    {
+        timeLine.KeyFrames.Add(keyFrame);
+        
+        ClearRedoStackIfNewOperation(canvas.RedoStack);
+    }
+
+    public override void Undo(Canvas canvas)
+    {
+        var operation = new DeleteKeyFrameOperation(keyFrame, timeLine)
+        {
+            IsNewOperation = IsNewOperation
+        };
+        operation.Execute(canvas);
+    }
+}
+
+internal class DeleteKeyFrameOperation(KeyFrame? keyFrame, TimeLine timeLine) : CanvasOperation
+{
+    public override void Execute(Canvas canvas)
+    {
+        timeLine.KeyFrames.Remove(keyFrame);
+        
+        ClearRedoStackIfNewOperation(canvas.RedoStack);
+    }
+
+    public override void Undo(Canvas canvas)
+    {
+        var operation = new AddKeyFrameOperation(keyFrame, timeLine)
+        {
+            IsNewOperation = IsNewOperation
+        };
+        operation.Execute(canvas);
+    }
+}
+
+internal class ChangeKeyFrameOperation(KeyFrame keyFrame, TimeLine timeLine, int oldFrame, int newFrame) : CanvasOperation
+{
+    public override void Execute(Canvas canvas)
+    {
+        keyFrame.Frame = newFrame;
+        
+        timeLine.Draw();
+        
+        ClearRedoStackIfNewOperation(canvas.RedoStack);
+    }
+
+    public override void Undo(Canvas canvas)
+    {
+        var operation = new ChangeKeyFrameOperation(keyFrame, timeLine, newFrame, oldFrame)
+        {
+            IsNewOperation = IsNewOperation
+        };
+        operation.Execute(canvas);
+    }
+}
+
+internal class HandleKeyFrameOperation(TimeLine timeLine, int currentFrame, IEnumerable<Figure> figures) : CanvasOperation
+{
+    private KeyFrame? _keyFrame;
+
+    public override void Execute(Canvas canvas)
+    {
+        var keyFrames = timeLine.KeyFrames;
+
+        if (keyFrames.Count <= 0) return;
+        var keyFrame = keyFrames.FirstOrDefault(kf => kf != null && kf.Frame == currentFrame);
+
+        if (keyFrame != null)
+        {
+            // If a keyframe for the current frame exists, update its Figures property
+            keyFrame.Figures = figures.Select(f => f.Clone()).ToList();
+            keyFrame.Figures.ForEach(f => f.IsSelected = false);
+            _keyFrame = keyFrame;
+        }
+        else
+        {
+            // If a keyframe for the current frame does not exist, create a new one and add it to the list
+            _keyFrame = new KeyFrame(currentFrame) { Figures = figures.Select(f => f.Clone()).ToList() };
+            _keyFrame.Figures.ForEach(f => f.IsSelected = false);
+            keyFrames.Add(_keyFrame);
+        }
+        
+        timeLine.Draw();
+    }
+
+    public override void Undo(Canvas canvas)
+    {
+        var keyFrames = timeLine.KeyFrames;
+
+        if (_keyFrame != null)
+        {
+            keyFrames.Remove(_keyFrame);
+        }
+        
+        timeLine.Draw();
     }
 }

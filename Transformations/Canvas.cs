@@ -1,5 +1,6 @@
 ﻿namespace Transformations;
-internal sealed class Canvas
+
+public sealed class Canvas
 {
     // TODO: If enough time, add selection box when dragging the mouse and when the mouse is released, select all figures inside the box.
     // TODO: Rotation needs to be added.
@@ -10,6 +11,7 @@ internal sealed class Canvas
     public readonly Stack<CanvasOperation> RedoStack = new();
     public readonly Stack<CanvasOperation> CustomFigureUndoStack = new();
     public readonly Stack<CanvasOperation> CustomFigureRedoStack = new();
+    public TimeLine? TimeLine;
     
     public bool CanUndo() => UndoStack.Count > 0;
     public bool CanRedo() => RedoStack.Count > 0;
@@ -19,7 +21,6 @@ internal sealed class Canvas
     private int _squareCounter;
     private int _triangleCounter;
     private int _customFigureCounter;
-    
     public event Action<Figure>? FigureAdded;
     public event Action<Figure>? FigureRemoved;
     
