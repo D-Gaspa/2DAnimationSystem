@@ -65,7 +65,6 @@
             duplicateButton = new Button();
             timeLinePictureBox = new PictureBox();
             addTimeLineButton = new Button();
-            colorDialog1 = new ColorDialog();
             resetTimeLineButton = new Button();
             playTimeLineButton = new Button();
             customTimeLineDurationCheckBox = new CheckBox();
@@ -84,7 +83,7 @@
             pictureBox1.Size = new Size(1178, 711);
             pictureBox1.TabIndex = 0;
             pictureBox1.TabStop = false;
-            pictureBox1.MouseClick += PictureBox1_MouseClick;
+            pictureBox1.MouseClick += PictureBox1_Click;
             pictureBox1.MouseDown += PictureBox1_MouseDown;
             pictureBox1.MouseMove += PictureBox1_MouseMove;
             pictureBox1.MouseUp += PictureBox1_MouseUp;
@@ -510,6 +509,9 @@
             timeLinePictureBox.TabStop = false;
             timeLinePictureBox.Visible = false;
             timeLinePictureBox.Click += timeLinePictureBox_Click;
+            timeLinePictureBox.MouseDown += timeLinePictureBox_MouseDown;
+            timeLinePictureBox.MouseMove += timeLinePictureBox_MouseMove;
+            timeLinePictureBox.MouseUp += timeLinePictureBox_MouseUp;
             // 
             // addTimeLineButton
             // 
@@ -538,6 +540,7 @@
             resetTimeLineButton.Text = "RESET TIMELINE";
             resetTimeLineButton.UseVisualStyleBackColor = false;
             resetTimeLineButton.Visible = false;
+            resetTimeLineButton.Click += resetTimeLineButton_Click;
             // 
             // playTimeLineButton
             // 
@@ -552,6 +555,7 @@
             playTimeLineButton.Text = "PLAY TIMELINE";
             playTimeLineButton.UseVisualStyleBackColor = false;
             playTimeLineButton.Visible = false;
+            playTimeLineButton.Click += playTimeLineButton_Click;
             // 
             // customTimeLineDurationCheckBox
             // 
@@ -563,6 +567,7 @@
             customTimeLineDurationCheckBox.TabIndex = 54;
             customTimeLineDurationCheckBox.Text = "Custom TimeLine Duration (Default 3s)";
             customTimeLineDurationCheckBox.UseVisualStyleBackColor = true;
+            customTimeLineDurationCheckBox.CheckedChanged += customTimeLineDurationCheckBox_CheckedChanged;
             // 
             // customTimeLineDurationLabel
             // 
@@ -578,6 +583,7 @@
             // 
             customTimeLineDurationTextBox.BackColor = Color.DimGray;
             customTimeLineDurationTextBox.BorderStyle = BorderStyle.FixedSingle;
+            customTimeLineDurationTextBox.ForeColor = SystemColors.Control;
             customTimeLineDurationTextBox.Location = new Point(635, 756);
             customTimeLineDurationTextBox.Name = "customTimeLineDurationTextBox";
             customTimeLineDurationTextBox.Size = new Size(77, 27);
@@ -635,6 +641,7 @@
             DoubleBuffered = true;
             ForeColor = SystemColors.Control;
             Name = "Form1";
+            StartPosition = FormStartPosition.CenterScreen;
             Text = "Form1";
             Load += Form1_Load;
             ((System.ComponentModel.ISupportInitialize)pictureBox1).EndInit();
@@ -682,7 +689,6 @@
         private Button duplicateButton;
         private PictureBox timeLinePictureBox;
         private Button addTimeLineButton;
-        private ColorDialog colorDialog1;
         private Button resetTimeLineButton;
         private Button playTimeLineButton;
         private CheckBox customTimeLineDurationCheckBox;
