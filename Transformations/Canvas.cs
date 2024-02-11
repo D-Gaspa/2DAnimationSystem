@@ -1,7 +1,8 @@
 ﻿namespace Transformations;
 internal sealed class Canvas
 {
-    // TODO: If enough time, add selection box when dragging the mouse and when the mouse is released, select all figures inside the box
+    // TODO: If enough time, add selection box when dragging the mouse and when the mouse is released, select all figures inside the box.
+    // TODO: Rotation needs to be added.
     
     public readonly List<Figure> Figures = [];
     public readonly List<PointF> CustomFigurePoints = [];
@@ -52,15 +53,6 @@ internal sealed class Canvas
 
         operation.IsNewOperation = false; // Mark the operation as not new
         
-        // If batch operation, mark all operations as not new
-        if (operation is BatchCanvasOperation batchOperation)
-        {
-            foreach (var op in batchOperation.Operations)
-            {
-                op.IsNewOperation = false;
-            }
-        }
-
         operation.Undo(this); // Perform the undo operation
 
         redoStack.Push(operation); // Push the operation to the redo stack

@@ -21,7 +21,7 @@ internal abstract class CanvasOperation
 
 internal class BatchCanvasOperation(List<CanvasOperation> operations) : CanvasOperation
 {
-    public List<CanvasOperation> Operations { get; } = operations;
+    private List<CanvasOperation> Operations { get; } = operations;
 
     public override void Execute(Canvas canvas)
     {
@@ -35,6 +35,8 @@ internal class BatchCanvasOperation(List<CanvasOperation> operations) : CanvasOp
     {
         foreach (var operation in Operations)
         {
+            // Mark the operation as not new
+            operation.IsNewOperation = false;
             operation.Undo(canvas);
         }
     }
@@ -189,10 +191,9 @@ internal class ChangeFillColorOperation(Figure figure, Color newColor) : CanvasO
         figure.FillColor = newColor;
         
         // Clear the redo stack only if it's a new operation
-        if (IsNewOperation)
-        {
-            canvas.CustomFigureRedoStack.Clear();
-        }
+        if (!IsNewOperation) return;
+        canvas.RedoStack.Clear();
+        canvas.CustomFigureRedoStack.Clear();
     }
 
     public override void Undo(Canvas canvas)
@@ -214,10 +215,9 @@ internal class ChangeBorderColorOperation(Figure figure, Color newColor) : Canva
         figure.BorderColor = newColor;
         
         // Clear the redo stack only if it's a new operation
-        if (IsNewOperation)
-        {
-            canvas.CustomFigureRedoStack.Clear();
-        }
+        if (!IsNewOperation) return;
+        canvas.RedoStack.Clear();
+        canvas.CustomFigureRedoStack.Clear();
     }
 
     public override void Undo(Canvas canvas)
@@ -650,17 +650,21 @@ internal class MovePivotOperation(Figure figure, PointF newPivot) : CanvasOperat
     }
 }
 
-internal class DuplicateFigureOperation(Figure figure) : CanvasOperation
+internal class DuplicateFigureOperation(Figure figure, string duplicateFigureName) : CanvasOperation
 {
-    private Figure _duplicate = null!;
+    private Figure? _duplicate;
 
     public override void Execute(Canvas canvas)
     {
         figure.IsSelected = false;
-        _duplicate = figure.Clone();
-        _duplicate.Translate(20, 20);
-        _duplicate.Name = canvas.GenerateUniqueFigureName(figure.GetType().Name);
-        _duplicate.IsSelected = true;
+        if (_duplicate == null)
+        {
+            _duplicate = figure.Clone();
+            _duplicate.Translate(20, 20);
+            _duplicate.Name = duplicateFigureName;
+            _duplicate.IsSelected = true;
+        }
+
         canvas.Figures.Add(_duplicate);
         canvas.OnFigureAdded(_duplicate);
         
@@ -673,7 +677,7 @@ internal class DuplicateFigureOperation(Figure figure) : CanvasOperation
 
     public override void Undo(Canvas canvas)
     {
-        var operation = new DeleteFigureOperation(_duplicate)
+        var operation = new DeleteFigureOperation(_duplicate!)
         {
             IsNewOperation = IsNewOperation
         };

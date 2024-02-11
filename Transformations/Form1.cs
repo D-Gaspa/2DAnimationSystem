@@ -1,23 +1,25 @@
 namespace Transformations;
 public partial class Form1 : Form
 {
+    private TimeLine _timeLine = null!;
+    private UnfinishedCustomFigure _unfinishedCustomFigure = null!;
     private readonly Canvas _canvas;
     private readonly Graphics _g;
+    private readonly Graphics _timeLineGraphics;
     private readonly Point _originalAddButtonLocation;
     private readonly Point _originalBorderColorButtonLocation;
     private readonly Point _originalFillColorButtonLocation;
-    private UnfinishedCustomFigure _unfinishedCustomFigure = null!;
-    private Color _borderColor;
-    private Color _fillColor;
     private bool _isAddFigureModeActive;
     private bool _isAddCustomFigureModeActive;
     private bool _isDragging;
     private bool _isDraggingPivot;
     private bool _isTranslating;
     private bool _isResizing;
+    private Color _borderColor;
+    private Color _fillColor;
+    private Point _initialMouseLocation;
+    private Point _currentMouseLocation;
     private RectangleF _originalBox;
-    private Point _initialMousePosition;
-    private Point _currentMousePosition;
     private List<Figure>? _tempSelectedFigures;
     private ResizePosition _currentResizePosition;
     
@@ -28,6 +30,11 @@ public partial class Form1 : Form
         var bmp = new Bitmap(pictureBox1.Width, pictureBox1.Height);
         _g = Graphics.FromImage(bmp);
         pictureBox1.Image = bmp;
+
+        var timeLineBmp = new Bitmap(timeLinePictureBox.Width, timeLinePictureBox.Height);
+        _timeLineGraphics = Graphics.FromImage(timeLineBmp);
+        timeLinePictureBox.Image = timeLineBmp;
+        
         _canvas = new Canvas();
         _originalAddButtonLocation = addFigureButton.Location;
         _originalBorderColorButtonLocation = borderColorButton.Location;
@@ -226,8 +233,8 @@ public partial class Form1 : Form
     private void HandleTranslationDragging(MouseEventArgs e)
     {
         // Calculate the translation vector
-        var dx = e.X - _currentMousePosition.X;
-        var dy = e.Y - _currentMousePosition.Y;
+        var dx = e.X - _currentMouseLocation.X;
+        var dy = e.Y - _currentMouseLocation.Y;
 
         // Translate each temporary figure
         if (_tempSelectedFigures == null) return;
@@ -236,8 +243,8 @@ public partial class Form1 : Form
             figure.Translate(dx, dy);
         }
 
-        // Update the current mouse position
-        _currentMousePosition = e.Location;
+        // Update the current mouse location
+        _currentMouseLocation = e.Location;
 
         // Render the canvas
         Canvas.Render(_g, pictureBox1);
@@ -417,7 +424,7 @@ public partial class Form1 : Form
 
     }
     
-    private void PictureBox1_MouseClick(object? sender, MouseEventArgs e)
+    private void PictureBox1_Click(object? sender, MouseEventArgs e)
     {
         if (_isAddCustomFigureModeActive)
         {
@@ -426,13 +433,13 @@ public partial class Form1 : Form
         }
         if (_isDraggingPivot)
         {
-            HandlePivotDraggingOnClick(e);
+            HandlePivotDragOnClick(e);
             return;
         }
         
         if (_isDragging)
         {
-            HandleFigureDraggingOnClick(e);
+            HandleFigureDragOnClick(e);
             return;
         }
         
@@ -480,7 +487,7 @@ public partial class Form1 : Form
         pictureBox1.Refresh();
     }
     
-    private void HandlePivotDraggingOnClick(MouseEventArgs e)
+    private void HandlePivotDragOnClick(MouseEventArgs e)
     {
         // Create a move pivot operation for each selected figure
         var operations = _canvas.Figures.Where(f => f.IsSelected)
@@ -499,7 +506,7 @@ public partial class Form1 : Form
         UpdateAllButtonStates();
     }
     
-    private void HandleFigureDraggingOnClick(MouseEventArgs e)
+    private void HandleFigureDragOnClick(MouseEventArgs e)
     {
         if (pictureBox1.Cursor == Cursors.SizeAll)
         {
@@ -515,8 +522,8 @@ public partial class Form1 : Form
     private void TranslateSelectedFigures(MouseEventArgs e)
     {
         // Calculate the translation vector
-        var dx = e.X - _initialMousePosition.X;
-        var dy = e.Y - _initialMousePosition.Y;
+        var dx = e.X - _initialMouseLocation.X;
+        var dy = e.Y - _initialMouseLocation.Y;
 
         // Create a translation operation for each selected figure
         var operations = _canvas.Figures.Where(f => f.IsSelected)
@@ -555,8 +562,8 @@ public partial class Form1 : Form
         batchOperation.Execute(_canvas);
         _canvas.UndoStack.Push(batchOperation);
         
-        // Update the initial mouse position
-        _initialMousePosition = e.Location;
+        // Update the initial mouse location
+        _initialMouseLocation = e.Location;
         
         // Render the figures
         RenderFigures();
@@ -652,10 +659,10 @@ public partial class Form1 : Form
             return;
         }
         
-        // Else, set the dragging state to true and update the initial mouse position
+        // Else, set the dragging state to true and update the initial mouse location
         _isDragging = true;
-        _initialMousePosition = e.Location;
-        _currentMousePosition = e.Location;
+        _initialMouseLocation = e.Location;
+        _currentMouseLocation = e.Location;
 
         // Check if we have a translation operation
         if (pictureBox1.Cursor == Cursors.SizeAll)
@@ -707,6 +714,9 @@ public partial class Form1 : Form
         if (_tempSelectedFigures == null) return;
         _tempSelectedFigures.Clear();
         _tempSelectedFigures = null;
+        
+        //RenderFigures();
+        // TODO
         
         // Update the button states
         UpdateAllButtonStates();
@@ -1140,13 +1150,13 @@ public partial class Form1 : Form
     private void RedoButton_Click(object sender, EventArgs e)
     {
         _canvas.Redo();
-        UpdateAllButtonStates();
         foreach (var figure in _canvas.Figures)
         {
             SetFigureSelection(figure, false);
         }
         RenderFigures();
         selectAllCheckBox.Checked = false;
+        UpdateAllButtonStates();
     }
     
     private void UndoCustomFigureButton_Click(object sender, EventArgs e)
@@ -1178,6 +1188,8 @@ public partial class Form1 : Form
         if (fillColorDialog.ShowDialog() != DialogResult.OK) return;
         _fillColor = fillColorDialog.Color;
         FillSelectedFigures();
+        RenderFigures();
+        UpdateButtonStates();
     }
     
     private void FillSelectedFigures()
@@ -1191,9 +1203,6 @@ public partial class Form1 : Form
         var batchOperation = new BatchCanvasOperation(operations);
         batchOperation.Execute(_canvas);
         _canvas.UndoStack.Push(batchOperation);
-
-        // Render the figures
-        RenderFigures();
     }
     
     private void borderColorSelectedButton_Click(object sender, EventArgs e)
@@ -1201,6 +1210,8 @@ public partial class Form1 : Form
         if (borderColorDialog.ShowDialog() != DialogResult.OK) return;
         _borderColor = borderColorDialog.Color;
         BorderSelectedFigures();
+        RenderFigures();
+        UpdateButtonStates();
     }
     
     private void BorderSelectedFigures()
@@ -1214,18 +1225,20 @@ public partial class Form1 : Form
         var batchOperation = new BatchCanvasOperation(operations);
         batchOperation.Execute(_canvas);
         _canvas.UndoStack.Push(batchOperation);
-
-        // Render the figures
-        RenderFigures();
     }
     
     private void DuplicateButton_Click(object sender, EventArgs e)
     {
         // Create a duplicate operation for each selected figure
         var operations = _canvas.Figures.Where(f => f.IsSelected)
-            .Select(figure => new DuplicateFigureOperation(figure) { IsNewOperation = true })
+            .Select(figure =>
+            {
+                // Generate a unique name for the duplicated figure
+                var duplicatedFigureName = _canvas.GenerateUniqueFigureName(figure.GetType().Name);
+                return new DuplicateFigureOperation(figure, duplicatedFigureName) { IsNewOperation = true };
+            })
             .Cast<CanvasOperation>().ToList();
-
+        
         // Execute the batch operation and push it to the undo stack
         var batchOperation = new BatchCanvasOperation(operations);
         batchOperation.Execute(_canvas);
@@ -1274,6 +1287,11 @@ public partial class Form1 : Form
         UpdateButtonState(borderColorCustomFigureButton, _canvas.CustomFigurePoints.Count > 1, Color.SteelBlue, DefaultBackColor);
         UpdateButtonState(fillColorCustomFigureButton, _canvas.CustomFigurePoints.Count > 2, Color.SteelBlue, DefaultBackColor);
     }
+    
+    private void UpdateTimeLineButtonStates()
+    {
+        UpdateButtonState(resetTimeLineButton, _timeLine.CanReset(), Color.DarkGreen, DefaultBackColor);
+    }
 
     private void UpdateButtonStates()
     {
@@ -1294,6 +1312,76 @@ public partial class Form1 : Form
         _borderColor = Color.White;
         _fillColor = Color.FromArgb(128, Color.White);
     }
+    
+    private void customTimeLineDurationCheckBox_CheckedChanged(object sender, EventArgs e)
+    {
+        var isChecked = customTimeLineDurationCheckBox.Checked;
+        customTimeLineDurationTextBox.Visible = isChecked;
+        customTimeLineDurationLabel.Visible = isChecked;
+    }
+
+    private void addTimeLineButton_Click(object sender, EventArgs e)
+    {
+        var duration = TimeLine.DefaultDuration;
+        if (customTimeLineDurationCheckBox.Checked)
+        {
+            if (!int.TryParse(customTimeLineDurationTextBox.Text, out duration) || duration < 3)
+            {
+                MessageBox.Show(@"Invalid custom timeline duration. It should be an integer greater than or equal to 3.");
+                return;
+            }
+        }
+        
+        // Set the control visibility
+        timeLinePictureBox.Visible = true;
+        playTimeLineButton.Visible = true;
+        resetTimeLineButton.Visible = true;
+        customTimeLineDurationCheckBox.Visible = false;
+        customTimeLineDurationLabel.Visible = false;
+        customTimeLineDurationTextBox.Visible = false;
+        addTimeLineButton.Visible = false;
+        
+        // Create a new TimeLine instance
+        _timeLine = new TimeLine(timeLinePictureBox, _timeLineGraphics, duration);
+        
+        // Draw the timeline
+        _timeLine.Draw();
+        
+        // Update the button states
+        UpdateTimeLineButtonStates();
+    }
+    
+    private void playTimeLineButton_Click(object sender, EventArgs e)
+    {
+        _timeLine.Play();
+    }
+    
+    private void resetTimeLineButton_Click(object sender, EventArgs e)
+    {
+        _timeLine.Reset();
+        UpdateTimeLineButtonStates();
+    }
+    
+    private void timeLinePictureBox_MouseMove(object sender, MouseEventArgs e)
+    {
+        _timeLine.HandleMouseMove(e);
+    }
+    
+    private void timeLinePictureBox_Click(object sender, EventArgs e)
+    {
+        _timeLine.HandleClick(e);
+    }
+    
+    private void timeLinePictureBox_MouseDown(object sender, MouseEventArgs e)
+    {
+        _timeLine.HandleMouseDown(e);
+    }
+    
+    private void timeLinePictureBox_MouseUp(object sender, MouseEventArgs e)
+    {
+        _timeLine.HandleMouseUp(e);
+        UpdateTimeLineButtonStates();
+    }
 
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
@@ -1310,8 +1398,16 @@ public partial class Form1 : Form
                 }
                 break;
             case Keys.Left:
+                if (timeLinePictureBox.Visible)
+                {
+                    _timeLine.MoveCursorLeft();
+                }
                 break;
             case Keys.Right:
+                if (timeLinePictureBox.Visible)
+                {
+                    _timeLine.MoveCursorRight();
+                }
                 break;
             case Keys.Up:
                 break;
@@ -1396,15 +1492,5 @@ public partial class Form1 : Form
         }
 
         return base.ProcessCmdKey(ref msg, keyData);
-    }
-
-    private void timeLinePictureBox_Click(object sender, EventArgs e)
-    {
-
-    }
-
-    private void addTimeLineButton_Click(object sender, EventArgs e)
-    {
-
     }
 }
