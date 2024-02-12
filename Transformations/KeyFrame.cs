@@ -9,4 +9,5 @@ public class KeyFrame(int frame)
     }
 
     public List<Figure>? Figures { get; set; }
+    public bool IsVisible { get; init; } = true;
 }

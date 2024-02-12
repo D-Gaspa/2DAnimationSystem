@@ -15,6 +15,7 @@ public partial class Form1 : Form
     private bool _isDraggingPivot;
     private bool _isTranslating;
     private bool _isResizing;
+    private bool _isRotating;
     private Color _borderColor;
     private Color _fillColor;
     private Point _initialMouseLocation;
@@ -227,6 +228,12 @@ public partial class Form1 : Form
         if (_isResizing)
         {
             HandleResizeDragging(e);
+            return;
+        }
+
+        if (_isRotating)
+        {
+            HandleRotationDragging(e);
         }
     }
     
@@ -291,6 +298,75 @@ public partial class Form1 : Form
         }
     }
     
+    private void HandleRotationDragging(MouseEventArgs e)
+    {
+        // Get the center of the figure to be rotated
+        var center = _canvas.Figures.First(f => f.IsRotating).GetCenter();
+        
+        // Calculate the vector from the center of the figure to the cursor's position
+        var dx = e.X - center.X;
+        var dy = e.Y - center.Y;
+
+        var angle = GetRotationAngle(dy, dx);
+
+        // Create a rotate operation for each selected figure (clone it first)
+        _tempSelectedFigures?.Clear();
+        
+        _tempSelectedFigures = _canvas.Figures.Where(f => f.IsSelected).Select(f => f.Clone()).ToList();
+        
+        var operations = _tempSelectedFigures
+            .Select(figure => new RotateFigureOperation(figure, angle) { IsNewOperation = false })
+            .Cast<CanvasOperation>().ToList();
+        
+        // Execute the operation
+        var batchOperation = new BatchCanvasOperation(operations);
+        batchOperation.Execute(_canvas);
+        
+        // Render the canvas
+        Canvas.Render(_g, canvasPictureBox);
+        
+        // Render all figures that are not selected (in the background)
+        foreach (var figure in _canvas.Figures.Where(f => !f.IsSelected))
+        {
+            figure.Draw(_g);
+        }
+        
+        // Render the temporary figures
+        foreach (var figure in _tempSelectedFigures)
+        {
+            figure.Draw(_g);
+        }
+    }
+
+    private static double GetRotationAngle(float dy, float dx)
+    {
+        // Calculate the angle of this vector relative to the positive x-axis
+        var angle = Math.Atan2(dy, dx);
+
+        // Convert this angle to degrees and adjust it to the range [0, 360]
+        angle = angle * 180 / Math.PI;
+        if (angle < 0)
+        {
+            angle += 360;
+            angle = 360 - angle;
+        }
+
+        angle = dx switch
+        {
+            // Adjust the angle based on the quadrant in which the cursor is located
+            > 0 when dy < 0 => 90 - angle,
+            > 0 when dy == 0 => 90,
+            > 0 when dy > 0 => 90 + angle,
+            0 when dy > 0 => 180,
+            < 0 when dy > 0 => 90 + angle,
+            < 0 when dy == 0 => 270,
+            < 0 when dy < 0 => 90 - angle,
+            0 when dy < 0 => 0,
+            _ => angle
+        };
+        return angle;
+    }
+
     private void HandleCursorChange(IEnumerable<Figure> selectedFigures, MouseEventArgs e)
     {
         foreach (var figure in selectedFigures)
@@ -299,6 +375,15 @@ public partial class Form1 : Form
             if (IsCursorAtPivot(figure, e.Location))
             {
                 canvasPictureBox.Cursor = Cursors.Hand;
+                return;
+            }
+            
+            // Check if the cursor is inside the rotation icon
+            if (IsInsideRotationIcon(figure, e.Location))
+            {
+                canvasPictureBox.Cursor = Cursors.Hand;
+                _isRotating = true;
+                figure.IsRotating = true;
                 return;
             }
 
@@ -316,12 +401,17 @@ public partial class Form1 : Form
                 return;
             }
 
-            if (!IsCursorAtSide(figure.GetBounds(), e.Location)) continue;
-            // Change the cursor based on its position relative to the figure's bounding rectangle
-            canvasPictureBox.Cursor = GetCursorForSide(figure.GetBounds(), e.Location);
-            return;
+            if (IsCursorAtSide(figure.GetBounds(), e.Location))
+            {
+                // Change the cursor based on its position relative to the figure's bounding rectangle
+                canvasPictureBox.Cursor = GetCursorForSide(figure.GetBounds(), e.Location);
+                return;
+            }
+            figure.IsRotating = false;
         }
-
+        
+        _isRotating = false;
+        
         canvasPictureBox.Cursor = Cursors.Default;
     }
 
@@ -332,6 +422,20 @@ public partial class Form1 : Form
         
         // Check if the cursor is near the pivot point
         return Math.Abs(figure.Pivot.X - point.X) <= tolerance && Math.Abs(figure.Pivot.Y - point.Y) <= tolerance;
+    }
+    
+    private static bool IsInsideRotationIcon(Figure figure, PointF point)
+    {
+        // Calculate the position of the rotation icon
+        var iconPosition =
+            new PointF(figure.GetBounds().Left + figure.GetBounds().Width / 2 - (float)figure.RotationIcon.Width / 2,
+                figure.GetBounds().Top - figure.RotationIcon.Height - 7);
+
+        // Create a rectangle that represents the bounds of the rotation icon
+        var iconBounds = new RectangleF(iconPosition.X, iconPosition.Y, figure.RotationIcon.Width, figure.RotationIcon.Height);
+
+        // Check if the point is inside the rectangle
+        return iconBounds.Contains(point);
     }
     
     private static bool IsCursorAtCorner(RectangleF bounds, PointF point)
@@ -511,12 +615,48 @@ public partial class Form1 : Form
         if (canvasPictureBox.Cursor == Cursors.SizeAll)
         {
             TranslateSelectedFigures(e);
+            return;
+        }
+        
+        if (canvasPictureBox.Cursor == Cursors.Hand && _isRotating)
+        {
+            RotateSelectedFigures(e);
+            return;
         }
 
-        else if (canvasPictureBox.Cursor != Cursors.Default)
+        if (canvasPictureBox.Cursor != Cursors.Default)
         {
             ResizeSelectedFigures(e);
         }
+    }
+    
+    private void RotateSelectedFigures(MouseEventArgs e)
+    {
+        // Get the center of the figure to be rotated
+        var center = _canvas.Figures.First(f => f.IsRotating).GetCenter();
+
+        // Calculate the vector from the center of the figure to the cursor's position
+        var dx = e.X - center.X;
+        var dy = e.Y - center.Y;
+
+        // Calculate the angle of this vector relative to the positive x-axis
+        var angle = GetRotationAngle(dy, dx);
+
+        // Create a rotate operation for each selected figure
+        var operations = _canvas.Figures.Where(f => f.IsSelected)
+            .Select(figure => new RotateFigureOperation(figure, angle) { IsNewOperation = true })
+            .Cast<CanvasOperation>().ToList();
+
+        // Execute the batch operation and push it to the undo stack
+        var batchOperation = new BatchCanvasOperation(operations);
+        batchOperation.Execute(_canvas);
+        _canvas.UndoStack.Push(batchOperation);
+        
+        // Render the figures
+        RenderFigures();
+        
+        // Update the button states
+        UpdateAllButtonStates();
     }
     
     private void TranslateSelectedFigures(MouseEventArgs e)
@@ -637,7 +777,7 @@ public partial class Form1 : Form
             return;
 
         // Check if we are dragging the pivot
-        if (canvasPictureBox.Cursor == Cursors.Hand)
+        if (canvasPictureBox.Cursor == Cursors.Hand && !_isRotating)
         {
             // If a pivot dragging operation is about to be performed, deselect all other figures and select the one that is being operated on
             var figureToOperateOn = _canvas.Figures.FirstOrDefault(f => IsCursorAtPivot(f, e.Location));
@@ -664,11 +804,13 @@ public partial class Form1 : Form
         _initialMouseLocation = e.Location;
         _currentMouseLocation = e.Location;
 
-        // Check if we have a translation operation
-        if (canvasPictureBox.Cursor == Cursors.SizeAll)
+        // Check if we have a translation or rotation operation
+        if (canvasPictureBox.Cursor == Cursors.SizeAll || _isRotating)
         {
-            _isTranslating = true;
-            
+            if (!_isRotating)
+            {
+                _isTranslating = true;
+            }
             // Create a temporary list of selected figures
             _tempSelectedFigures = _canvas.Figures.Where(f => f.IsSelected).Select(f => f.Clone()).ToList();
             
@@ -709,6 +851,7 @@ public partial class Form1 : Form
         _isDragging = false;
         _isTranslating = false;
         _isResizing = false;
+        _isRotating = false;
         
         // If the temporary list of selected figures is null, return
         if (_tempSelectedFigures == null) return;
@@ -1191,6 +1334,7 @@ public partial class Form1 : Form
         // Render the figures
         RenderFigures();
         UpdateButtonStates();
+        UpdateButtonVisibilityBasedOnSelection();
     }
     
     private void fillColorSelectedButton_Click(object sender, EventArgs e)
