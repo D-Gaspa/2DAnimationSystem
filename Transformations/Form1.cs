@@ -1470,15 +1470,12 @@ public partial class Form1 : Form
         DisableButton(redoButton);
         DisableButton(deleteButton);
         DisableButton(resetButton);
-        DisableButton(borderColorButton);
-        DisableButton(fillColorButton);
         DisableButton(addCustomFigureButton);
         DisableButton(resetCustomFigureButton);
         DisableButton(undoCustomFigureButton);
         DisableButton(redoCustomFigureButton);
         DisableButton(borderColorCustomFigureButton);
         DisableButton(fillColorCustomFigureButton);
-        DisableButton(addFigureButton);
         DisableButton(playTimeLineButton);
         DisableButton(resetTimeLineButton);
     }
@@ -1554,7 +1551,11 @@ public partial class Form1 : Form
         
         UpdateButtonVisibilityBasedOnSelection();
         
+        playTimeLineButton.Visible = false;
+        
         _timeLine?.Play(_g, canvasPictureBox);
+        
+        playTimeLineButton.Visible = true;
     }
     
     private void resetTimeLineButton_Click(object sender, EventArgs e)

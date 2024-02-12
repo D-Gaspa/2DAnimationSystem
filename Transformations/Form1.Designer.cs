@@ -668,7 +668,7 @@
         private Label pivotOffsetLabel;
         private Button addFigureButton;
         private CheckBox customPivotCheckBox;
-        private CheckBox addFigureCheckBox;
+        public CheckBox addFigureCheckBox;
         private CheckBox selectAllCheckBox;
         private ColorDialog borderColorDialog;
         private ColorDialog fillColorDialog;

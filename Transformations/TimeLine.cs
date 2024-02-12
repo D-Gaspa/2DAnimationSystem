@@ -24,6 +24,7 @@ public class TimeLine(
     private bool _isAtAddKeyFrameIcon;
     private bool _isDraggingPlayHead;
     private bool _isDraggingKeyFrame;
+    private bool _isPlaying;
     private KeyFrame? _draggedKeyFrame;
     private int _oldDraggedKeyFrame;
     public readonly List<KeyFrame?> KeyFrames = [];
@@ -102,6 +103,7 @@ public class TimeLine(
     {
         var isStartKeyFrameAdded = false;
         var isEndKeyFrameAdded = false;
+        _isPlaying = true;
         
         // Sort the keyframes by their frame number
         KeyFrames.Sort((a, b) =>
@@ -142,6 +144,8 @@ public class TimeLine(
         // Disable the buttons on the form
         form.DisableButtons();
         
+        form.addFigureCheckBox.Checked = false;
+        
         // Disable mouse events on the canvas
         canvasPictureBox.Enabled = false;
         
@@ -181,12 +185,41 @@ public class TimeLine(
                 // Interpolate between the states of the figures in the two keyframes
                 foreach (var startFigureName in startFiguresDict?.Keys!)
                 {
-                    var startFigure = startFiguresDict[startFigureName].Clone(); // Create a copy of the startFigure
+                    var startFigure = startFiguresDict[startFigureName].Clone();  // Create a copy of the startFigure
                     
                     // If the end keyframe does not contain a figure with the same name, continue to the next figure
                     if (!endFiguresDict!.ContainsKey(startFigureName)) continue;
 
                     var endFigure = endFiguresDict[startFigureName].Clone();  // Create a copy of the endFigure
+                    
+                    // // Interpolate the flips of the figure
+                    // if (startFigure.HasFlippedX != endFigure.HasFlippedX)
+                    // {
+                    //     var effectiveT = t < 0.5 ? t * 2 : 2 * (1 - t);
+                    //
+                    //     // Figure out if X flip needs to 'collapse' or 'expand' 
+                    //     var needsXCollapse = t < 0.5; 
+                    //
+                    //     // Perform scaled flip
+                    //     var scaledFlipFigure = startFigure.Clone();
+                    //     scaledFlipFigure.DoScaledFlip(true, false, effectiveT, needsXCollapse); 
+                    //     
+                    //     startFigure = scaledFlipFigure;
+                    // } 
+                    //
+                    // if (startFigure.HasFlippedY != endFigure.HasFlippedY) 
+                    // {
+                    //     var effectiveT = t < 0.5 ? t * 2 : 2 * (1 - t);
+                    //
+                    //     // Figure out if Y flip needs to 'collapse' or 'expand' 
+                    //     var needsYCollapse = t < 0.5; 
+                    //
+                    //     // Perform scaled flip
+                    //     var scaledFlipFigure = startFigure.Clone();
+                    //     scaledFlipFigure.DoScaledFlip(false, true, effectiveT, needsYCollapse);
+                    //     
+                    //     startFigure = scaledFlipFigure;
+                    // }
                     
                     // Interpolate the size (scaling) of the figure
                     var startBounds = startFigure.GetBounds();
@@ -199,8 +232,6 @@ public class TimeLine(
                         var angleDifference = endFigure.RotationAngle - startFigure.RotationAngle;
                         var endFigureCorrected = endFigure.Clone();
                         endFigureCorrected.Rotate(-angleDifference);
-                        
-                        endFigureCorrected.Rotate(-endFigure.RotationAngle);
                         endBounds = endFigureCorrected.GetBounds();
                     }
                     else
@@ -209,7 +240,7 @@ public class TimeLine(
                     }
                     
                     var interpolatedBounds = Interpolate(startBounds, endBounds, t);
-
+                    
                     // Apply interpolated bounds to the figure
                     startFigure.SetBounds(interpolatedBounds);
                     
@@ -277,6 +308,7 @@ public class TimeLine(
         // Regain control of the form and the canvas
         canvasGraphics.Clear(Color.Black);
         canvasPictureBox.Enabled = true;
+        _isPlaying = false;
         form.RenderFigures();
         form.UpdateAllButtonStates();
         canvasPictureBox.Invalidate();
@@ -537,8 +569,11 @@ public class TimeLine(
         
         // Refresh the PictureBox
         pictureBox.Invalidate();
-        
-        form.UpdateTimeLineButtonStates();
+
+        if (!_isPlaying)
+        {
+            form.UpdateTimeLineButtonStates();
+        }
     }
     
     private void DrawFrameLine(int frame, float x)
