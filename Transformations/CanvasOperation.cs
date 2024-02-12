@@ -67,7 +67,7 @@ internal class AddFigureOperation(Figure figure) : CanvasOperation
 
         if (canvas.TimeLine != null)
         {
-            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures);
+            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures, this);
             _handleKeyFrameOperation.Execute(canvas);
         }
 
@@ -89,6 +89,7 @@ internal class AddFigureOperation(Figure figure) : CanvasOperation
 internal class DeleteFigureOperation(Figure figure) : CanvasOperation
 {
     private HandleKeyFrameOperation? _handleKeyFrameOperation;
+    public Figure Figure => figure;
 
     public override void Execute(Canvas canvas)
     {
@@ -97,7 +98,7 @@ internal class DeleteFigureOperation(Figure figure) : CanvasOperation
         
         if (canvas.TimeLine != null)
         {
-            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures);
+            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures, this);
             _handleKeyFrameOperation.Execute(canvas);
         }
         
@@ -131,7 +132,7 @@ internal class RotateFigureOperation(Figure figure, double angle) : TransformFig
         
         if (canvas.TimeLine != null)
         {
-            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures);
+            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures, this);
             _handleKeyFrameOperation.Execute(canvas);
         }
         
@@ -160,7 +161,7 @@ internal class TranslateFigureOperation(Figure figure, double dx, double dy) : T
         
         if (canvas.TimeLine != null)
         {
-            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures);
+            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures, this);
             _handleKeyFrameOperation.Execute(canvas);
         }
         
@@ -223,7 +224,7 @@ internal class ChangeFillColorOperation(Figure figure, Color newColor) : CanvasO
         
         if (canvas.TimeLine != null)
         {
-            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures);
+            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures, this);
             _handleKeyFrameOperation.Execute(canvas);
         }
         
@@ -259,7 +260,7 @@ internal class ChangeBorderColorOperation(Figure figure, Color newColor) : Canva
         
         if (canvas.TimeLine != null)
         {
-            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures);
+            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures, this);
             _handleKeyFrameOperation.Execute(canvas);
         }
         
@@ -317,12 +318,51 @@ internal class ResizeFigureOperation(
         ScaleAndTranslateFigure(newBoundingBox);
 
         HandleFlip();
+        
+        // If figure was already flipped, set the flags to false
+        if (IsNewOperation)
+        {
+            if (figure.HasFlippedX)
+            {
+                if (_wasFlippedX)
+                {
+                    figure.HasFlippedX = false;
+                }
+            }
+            else
+            {
+                if (_wasFlippedX)
+                {
+                    figure.HasFlippedX = true;
+                }
+            }
+        
+            if (figure.HasFlippedY)
+            {
+                if (_wasFlippedY)
+                {
+                    figure.HasFlippedY = false;
+                }
+            }
+            else
+            {
+                if (_wasFlippedY)
+                {
+                    figure.HasFlippedY = true;
+                }
+            }
+            
+            if (figure is { HasFlippedX: false, HasFlippedY: false })
+            {
+                figure.HasFlipped = false;
+            }
+        }
 
         figure.PreviousResizePosition = currentResizePosition;
         
         if (canvas.TimeLine != null)
         {
-            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures);
+            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures, this);
             _handleKeyFrameOperation.Execute(canvas);
         }
         
@@ -716,7 +756,7 @@ internal class DuplicateFigureOperation(Figure figure, string duplicateFigureNam
         
         if (canvas.TimeLine != null)
         {
-            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures);
+            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures, this);
             _handleKeyFrameOperation.Execute(canvas);
         }
         
@@ -794,7 +834,7 @@ internal class ChangeKeyFrameOperation(KeyFrame keyFrame, TimeLine timeLine, int
     }
 }
 
-internal class HandleKeyFrameOperation(TimeLine timeLine, int currentFrame, IEnumerable<Figure> figures) : CanvasOperation
+internal class HandleKeyFrameOperation(TimeLine timeLine, int currentFrame, IEnumerable<Figure> figures, CanvasOperation operation) : CanvasOperation
 {
     private KeyFrame? _keyFrame;
 
@@ -803,6 +843,22 @@ internal class HandleKeyFrameOperation(TimeLine timeLine, int currentFrame, IEnu
         var keyFrames = timeLine.KeyFrames;
 
         if (keyFrames.Count <= 0) return;
+        
+        // If the operation is a delete figure operation, remove the figure from all keyframes
+        if (operation is DeleteFigureOperation deleteFigureOperation)
+        {
+            foreach (var kf in keyFrames)
+            {
+                kf?.Figures?.RemoveAll(f => f.Name == deleteFigureOperation.Figure.Name);
+            }
+            
+            // Remove any keyframes that have no figures
+            keyFrames.RemoveAll(kf => kf?.Figures?.Count == 0);
+            
+            timeLine.Draw();
+            return;
+        }
+        
         var keyFrame = keyFrames.FirstOrDefault(kf => kf != null && kf.Frame == currentFrame);
 
         if (keyFrame != null)

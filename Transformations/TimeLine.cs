@@ -100,6 +100,9 @@ public class TimeLine(
 
     public async Task Play(Graphics canvasGraphics, PictureBox canvasPictureBox)
     {
+        var isStartKeyFrameAdded = false;
+        var isEndKeyFrameAdded = false;
+        
         // Sort the keyframes by their frame number
         KeyFrames.Sort((a, b) =>
         {
@@ -121,8 +124,9 @@ public class TimeLine(
         {
             // If not, create a keyframe at the beginning with the same figures as the next keyframe
             var nextKeyFrame = KeyFrames[0];
-            var startKeyFrame = new KeyFrame(0) { Figures = nextKeyFrame!.Figures!.Select(f => f.Clone()).ToList() };
+            var startKeyFrame = new KeyFrame(0) { Figures = nextKeyFrame!.Figures!.Select(f => f.Clone()).ToList(), IsVisible = false };
             KeyFrames.Insert(0, startKeyFrame);
+            isStartKeyFrameAdded = true;
         }
 
         // Check if there is a keyframe at the end
@@ -130,8 +134,9 @@ public class TimeLine(
         {
             // If not, create a keyframe at the end with the same figures as the last keyframe
             var lastKeyFrame = KeyFrames[^1];
-            var endKeyFrame = new KeyFrame(_totalFrames) { Figures = lastKeyFrame!.Figures!.Select(f => f.Clone()).ToList() };
+            var endKeyFrame = new KeyFrame(_totalFrames) { Figures = lastKeyFrame!.Figures!.Select(f => f.Clone()).ToList(), IsVisible = false };
             KeyFrames.Add(endKeyFrame);
+            isEndKeyFrameAdded = true;
         }
         
         // Disable the buttons on the form
@@ -146,8 +151,14 @@ public class TimeLine(
             var startKeyFrame = KeyFrames[i];
             var endKeyFrame = KeyFrames[i + 1];
 
+            // Create a dictionary for each keyframe
+            var startFiguresDict = startKeyFrame?.Figures!.ToDictionary(f => f.Name, f => f);
+            var endFiguresDict = endKeyFrame?.Figures!.ToDictionary(f => f.Name, f => f);
+
             // Calculate the number of frames in this animation segment
             var segmentFrames = endKeyFrame!.Frame - startKeyFrame!.Frame;
+
+            // Iterate over each frame in the animation segment
 
             // Iterate over each frame in the animation segment
             for (var frame = 0; frame <= segmentFrames; frame++)
@@ -160,20 +171,68 @@ public class TimeLine(
 
                 // Calculate the interpolation factor
                 var t = (float)frame / segmentFrames;
-
+                
+                // Apply the easing function to the interpolation factor
+                t = t < 0.5 ? 4 * t * t * t : (t - 1) * (2 * t - 2) * (2 * t - 2) + 1;
+                
                 // Clear the canvas before drawing the interpolated figures
                 canvasGraphics.Clear(Color.Black);
 
                 // Interpolate between the states of the figures in the two keyframes
-                for (var j = 0; j < startKeyFrame.Figures!.Count; j++)
+                foreach (var startFigureName in startFiguresDict?.Keys!)
                 {
-                    var startFigure = startKeyFrame.Figures[j].Clone(); // Create a copy of the startFigure
-                    var endFigure = endKeyFrame.Figures![j];
+                    var startFigure = startFiguresDict[startFigureName].Clone(); // Create a copy of the startFigure
+                    
+                    // If the end keyframe does not contain a figure with the same name, continue to the next figure
+                    if (!endFiguresDict!.ContainsKey(startFigureName)) continue;
+
+                    var endFigure = endFiguresDict[startFigureName].Clone();  // Create a copy of the endFigure
+                    
+                    // Interpolate the size (scaling) of the figure
+                    var startBounds = startFigure.GetBounds();
+                    RectangleF endBounds;
+                    
+                    // If the figures angle is not the same, correct the end figure to get the right bounds
+                    if (Math.Abs(startFigure.RotationAngle - endFigure.RotationAngle) > 0.00005)
+                    {
+                        // Calculate the difference in the angles
+                        var angleDifference = endFigure.RotationAngle - startFigure.RotationAngle;
+                        var endFigureCorrected = endFigure.Clone();
+                        endFigureCorrected.Rotate(-angleDifference);
+                        
+                        endFigureCorrected.Rotate(-endFigure.RotationAngle);
+                        endBounds = endFigureCorrected.GetBounds();
+                    }
+                    else
+                    {
+                        endBounds = endFigure.GetBounds();
+                    }
+                    
+                    var interpolatedBounds = Interpolate(startBounds, endBounds, t);
+
+                    // Apply interpolated bounds to the figure
+                    startFigure.SetBounds(interpolatedBounds);
+                    
+                    // Apply flips based on flags and threshold
+                    if (startFigure.HasFlippedX != endFigure.HasFlippedX && t > 0.5) 
+                    {
+                        startFigure.Flip(true, false); 
+                    }
+                    if (startFigure.HasFlippedY != endFigure.HasFlippedY && t > 0.5) 
+                    {
+                        startFigure.Flip(false, true); 
+                    }
 
                     // Interpolate the position (translation) of the figure
                     var dx = (endFigure.Pivot.X - startFigure.Pivot.X) * t;
                     var dy = (endFigure.Pivot.Y - startFigure.Pivot.Y) * t;
                     startFigure.Translate(dx, dy);
+                    
+                    // Interpolate the rotation of the figure
+                    var startAngle = startFigure.RotationAngle;
+                    var endAngle = endFigure.RotationAngle;
+                    var angle = startAngle + (endAngle - startAngle) * t;
+                    startFigure.Rotate(angle - startAngle);
 
                     // Interpolate the colors of the figure
                     var fillColor = Interpolate(startFigure.FillColor, endFigure.FillColor, t);
@@ -204,6 +263,18 @@ public class TimeLine(
                 await Task.Delay(delay);
             }
         }
+        
+        // Remove the start and end keyframes if they were added
+        if (isStartKeyFrameAdded)
+        {
+            KeyFrames.RemoveAt(0);
+        }
+        if (isEndKeyFrameAdded)
+        {
+            KeyFrames.RemoveAt(KeyFrames.Count - 1);
+        }
+        
+        // Regain control of the form and the canvas
         canvasGraphics.Clear(Color.Black);
         canvasPictureBox.Enabled = true;
         form.RenderFigures();
@@ -218,6 +289,16 @@ public class TimeLine(
         var g = (int)(start.G + t * (end.G - start.G));
         var b = (int)(start.B + t * (end.B - start.B));
         return Color.FromArgb(a, r, g, b);
+    }
+    
+    private static RectangleF Interpolate(RectangleF startBounds, RectangleF endBounds, float t)
+    {
+        var interpolatedX = startBounds.X + (endBounds.X - startBounds.X) * t;
+        var interpolatedY = startBounds.Y + (endBounds.Y - startBounds.Y) * t;
+        var interpolatedWidth = startBounds.Width + (endBounds.Width - startBounds.Width) * t;
+        var interpolatedHeight = startBounds.Height + (endBounds.Height - startBounds.Height) * t;
+
+        return new RectangleF(interpolatedX, interpolatedY, interpolatedWidth, interpolatedHeight);
     }
 
     public void Reset()
@@ -432,7 +513,7 @@ public class TimeLine(
             
             DrawFrameLine(frame, x);
 
-            if (KeyFrames.All(kf => kf != null && kf.Frame != frame)) continue; // if the frame is a keyframe
+            if (KeyFrames.All(kf => kf != null && kf.Frame != frame || !kf!.IsVisible)) continue; // if the frame is a keyframe
             
             // draw a diamond at the middle of the PictureBox at the cursor
             var middleY = pictureBox.Height / 2;

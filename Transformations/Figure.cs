@@ -6,11 +6,16 @@ public abstract class Figure
 {
     public string Name { get; set; }
     protected PointF[] Points;
-    public PointF Pivot;
+    public PointF Pivot; 
+    public readonly Image RotationIcon = Resources.RotationIcon;
+    public double RotationAngle { get; private set; }
+    public bool IsRotating { get; set; }
     public Color BorderColor { get; set; } = Color.White;
     public Color FillColor { get; set; } = Color.FromArgb(128, Color.White);
     public bool IsSelected { get; set; }
     public bool HasFlipped { get; set; }
+    public bool HasFlippedX { get; set; }
+    public bool HasFlippedY { get; set; }
     public ResizePosition PreviousResizePosition { get; set; }
     
     protected Figure(PointF[] points, PointF position, PointF pivotOffset, string name)
@@ -24,6 +29,12 @@ public abstract class Figure
     private void CalculatePivot(PointF pivotOffset)
     {
         Pivot = new PointF(Points.Average(p => p.X) + pivotOffset.X, Points.Average(p => p.Y) + pivotOffset.Y);
+    }
+    
+    public PointF GetCenter()
+    {
+        var bounds = GetBounds();
+        return new PointF(bounds.Left + bounds.Width / 2, bounds.Top + bounds.Height / 2);
     }
 
     private void AdjustPositionToPivot(PointF position)
@@ -45,6 +56,13 @@ public abstract class Figure
 
             return new PointF((float)newX, (float)newY);
         }).ToArray();
+        
+        // Normalize the angle to the range [0, 360]
+        angle %= 360;
+        
+        RotationAngle += angle;
+        
+        RotationAngle %= 360;
     }
 
     public void Translate(double dx, double dy)
@@ -79,6 +97,15 @@ public abstract class Figure
         var maxY = Points.Max(p => p.Y);
 
         return new RectangleF(minX, minY, maxX - minX, maxY - minY);
+    }
+    
+    public void SetBounds(RectangleF bounds)
+    {
+        var currentBounds = GetBounds();
+        var scaleX = bounds.Width / currentBounds.Width;
+        var scaleY = bounds.Height / currentBounds.Height;
+        Scale(scaleX, scaleY);
+        Translate(bounds.Left - currentBounds.Left, bounds.Top - currentBounds.Top);
     }
 
     private IEnumerable<PointF> GetSelectionPoints()
@@ -155,6 +182,11 @@ public abstract class Figure
             // Draw the selection points as small rectangles
             g.FillRectangle(Brushes.White, point.X - 4, point.Y - 4, 8, 8);
         }
+        
+        // Draw the rotate icon above the figure if it is selected
+        var iconPosition = new PointF(bounds.Left + bounds.Width / 2 - (float)RotationIcon.Width / 2,
+            bounds.Top - RotationIcon.Height - 7);
+        g.DrawImage(RotationIcon, iconPosition);
     }
 }
 
