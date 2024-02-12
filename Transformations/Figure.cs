@@ -145,6 +145,36 @@ public abstract class Figure
         Pivot = pivotPoints[0];
     }
     
+    public void DoScaledFlip(bool needsXFlip, bool needsYFlip, float scaleFactor, bool needsCollapse)
+    {
+        var bounds = GetBounds();
+        var pivot = new PointF(bounds.Left + bounds.Width / 2, bounds.Top + bounds.Height / 2); // Recalculate pivot for dynamic bounds
+        var flipMatrix = new Matrix();
+
+        flipMatrix.Translate(pivot.X, pivot.Y);
+
+        // Collapse or Expand in X 
+        if (needsXFlip) 
+        {
+            var scaleX = needsCollapse ? 1 - scaleFactor : 1 + scaleFactor; 
+            flipMatrix.Scale(scaleX, 1); 
+        }
+
+        // Collapse or Expand in Y
+        if (needsYFlip) 
+        {
+            var scaleY = needsCollapse ? 1 - scaleFactor : 1 + scaleFactor; 
+            flipMatrix.Scale(1, scaleY); 
+        }
+
+        flipMatrix.Translate(-pivot.X, -pivot.Y);
+        flipMatrix.TransformPoints(Points);
+
+        var pivotPoints = new[] { Pivot };
+        flipMatrix.TransformPoints(pivotPoints);
+        Pivot = pivotPoints[0];
+    }
+    
     public virtual void Draw(Graphics g)
     {
         // Draw the figure
