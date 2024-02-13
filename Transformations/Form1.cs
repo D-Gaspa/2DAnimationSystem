@@ -96,6 +96,11 @@ public partial class Form1 : Form
             addFigureCheckBox_CheckedChanged(this, EventArgs.Empty);
         }
         
+        if (_timeLine != null)
+        {
+            playTimeLineButton.Visible = !_isAddCustomFigureModeActive;
+        }
+        
         // Update the visibility of the controls based on the state of the addCustomFigureCheckBox.
         var invisibleControls = new List<Control>
         {
@@ -902,6 +907,11 @@ public partial class Form1 : Form
         
         _unfinishedCustomFigure = null!;
         
+        if (_timeLine != null)
+        {
+            playTimeLineButton.Visible = true;
+        }
+        
         // Render the figures
         RenderFigures();
 
@@ -1288,7 +1298,7 @@ public partial class Form1 : Form
         _timeLine?.Draw();
 
         selectAllCheckBox.Checked = false;
-        UpdateTimeLineButtonStates();
+        UpdateAllButtonStates();
     }
 
     private void RedoButton_Click(object sender, EventArgs e)
@@ -1302,9 +1312,9 @@ public partial class Form1 : Form
         
         _timeLine?.Draw();
         
+        
         selectAllCheckBox.Checked = false;
         UpdateAllButtonStates();
-        UpdateTimeLineButtonStates();
     }
     
     private void UndoCustomFigureButton_Click(object sender, EventArgs e)
