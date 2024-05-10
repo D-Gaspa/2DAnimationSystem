@@ -4,10 +4,19 @@ namespace Transformations;
 
 public abstract class Figure
 {
-    public string Name { get; set; }
-    protected PointF[] Points;
-    public PointF Pivot; 
     public readonly Image RotationIcon = Resources.RotationIcon;
+    public PointF Pivot;
+    protected PointF[] Points;
+
+    protected Figure(PointF[] points, PointF position, PointF pivotOffset, string name)
+    {
+        Name = name;
+        Points = points;
+        CalculatePivot(pivotOffset); // Calculate the pivot point
+        AdjustPositionToPivot(position); // Adjust the position to match the pivot point
+    }
+
+    public string Name { get; set; }
     public double RotationAngle { get; private set; }
     public bool IsRotating { get; set; }
     public Color BorderColor { get; set; } = Color.White;
@@ -17,20 +26,12 @@ public abstract class Figure
     public bool HasFlippedX { get; set; }
     public bool HasFlippedY { get; set; }
     public ResizePosition PreviousResizePosition { get; set; }
-    
-    protected Figure(PointF[] points, PointF position, PointF pivotOffset, string name)
-    {
-        Name = name;
-        Points = points;
-        CalculatePivot(pivotOffset); // Calculate the pivot point
-        AdjustPositionToPivot(position); // Adjust the position to match the pivot point
-    }
 
     private void CalculatePivot(PointF pivotOffset)
     {
         Pivot = new PointF(Points.Average(p => p.X) + pivotOffset.X, Points.Average(p => p.Y) + pivotOffset.Y);
     }
-    
+
     public PointF GetCenter()
     {
         var bounds = GetBounds();
@@ -56,12 +57,12 @@ public abstract class Figure
 
             return new PointF((float)newX, (float)newY);
         }).ToArray();
-        
+
         // Normalize the angle to the range [0, 360]
         angle %= 360;
-        
+
         RotationAngle += angle;
-        
+
         RotationAngle %= 360;
     }
 
@@ -81,14 +82,14 @@ public abstract class Figure
             return new PointF((float)x, (float)y);
         }).ToArray();
     }
-    
+
     public bool IsInsideFigure(PointF point)
     {
         using var path = new GraphicsPath();
         path.AddPolygon(Points);
         return path.IsVisible(point);
     }
-    
+
     public RectangleF GetBounds()
     {
         var minX = Points.Min(p => p.X);
@@ -98,7 +99,7 @@ public abstract class Figure
 
         return new RectangleF(minX, minY, maxX - minX, maxY - minY);
     }
-    
+
     public void SetBounds(RectangleF bounds)
     {
         var currentBounds = GetBounds();
@@ -124,12 +125,12 @@ public abstract class Figure
             new PointF(bounds.Left, bounds.Top + bounds.Height / 2) // Left side
         ];
     }
-    
+
     public Figure Clone()
     {
         return (Figure)MemberwiseClone();
     }
-    
+
     public void Flip(bool needsXFlip, bool needsYFlip)
     {
         var bounds = GetBounds();
@@ -139,32 +140,33 @@ public abstract class Figure
         flipMatrix.Scale(needsXFlip ? -1 : 1, needsYFlip ? -1 : 1);
         flipMatrix.Translate(-pivot.X, -pivot.Y);
         flipMatrix.TransformPoints(Points);
-        
+
         var pivotPoints = new[] { Pivot };
         flipMatrix.TransformPoints(pivotPoints);
         Pivot = pivotPoints[0];
     }
-    
+
     public void DoScaledFlip(bool needsXFlip, bool needsYFlip, float scaleFactor, bool needsCollapse)
     {
         var bounds = GetBounds();
-        var pivot = new PointF(bounds.Left + bounds.Width / 2, bounds.Top + bounds.Height / 2); // Recalculate pivot for dynamic bounds
+        var pivot = new PointF(bounds.Left + bounds.Width / 2,
+            bounds.Top + bounds.Height / 2); // Recalculate pivot for dynamic bounds
         var flipMatrix = new Matrix();
 
         flipMatrix.Translate(pivot.X, pivot.Y);
 
         // Collapse or Expand in X 
-        if (needsXFlip) 
+        if (needsXFlip)
         {
-            var scaleX = needsCollapse ? 1 - scaleFactor : 1 + scaleFactor; 
-            flipMatrix.Scale(scaleX, 1); 
+            var scaleX = needsCollapse ? 1 - scaleFactor : 1 + scaleFactor;
+            flipMatrix.Scale(scaleX, 1);
         }
 
         // Collapse or Expand in Y
-        if (needsYFlip) 
+        if (needsYFlip)
         {
-            var scaleY = needsCollapse ? 1 - scaleFactor : 1 + scaleFactor; 
-            flipMatrix.Scale(1, scaleY); 
+            var scaleY = needsCollapse ? 1 - scaleFactor : 1 + scaleFactor;
+            flipMatrix.Scale(1, scaleY);
         }
 
         flipMatrix.Translate(-pivot.X, -pivot.Y);
@@ -174,7 +176,7 @@ public abstract class Figure
         flipMatrix.TransformPoints(pivotPoints);
         Pivot = pivotPoints[0];
     }
-    
+
     public virtual void Draw(Graphics g)
     {
         // Draw the figure
@@ -183,7 +185,7 @@ public abstract class Figure
 
         using var borderPen = new Pen(BorderColor);
         g.DrawPolygon(borderPen, Points);
-        
+
         // // Draw coordinates
         // var font = new Font("Arial", 8);
         // var brush = new SolidBrush(Color.White);
@@ -194,7 +196,9 @@ public abstract class Figure
 
         // Draw the pivot point as a small circle
         const float pivotSize = 5; // Size of the pivot circle
-        if (Pivot.X - pivotSize / 2 >= 0 && Pivot.Y - pivotSize / 2 >= 0 && Pivot.X + pivotSize / 2 <= g.VisibleClipBounds.Width && Pivot.Y + pivotSize / 2 <= g.VisibleClipBounds.Height)
+        if (Pivot.X - pivotSize / 2 >= 0 && Pivot.Y - pivotSize / 2 >= 0 &&
+            Pivot.X + pivotSize / 2 <= g.VisibleClipBounds.Width &&
+            Pivot.Y + pivotSize / 2 <= g.VisibleClipBounds.Height)
         {
             using var pivotPen = new Pen(Color.Red);
             g.DrawEllipse(pivotPen, Pivot.X - pivotSize / 2, Pivot.Y - pivotSize / 2, pivotSize, pivotSize);
@@ -208,11 +212,9 @@ public abstract class Figure
 
         var points = GetSelectionPoints();
         foreach (var point in points)
-        {
             // Draw the selection points as small rectangles
             g.FillRectangle(Brushes.White, point.X - 4, point.Y - 4, 8, 8);
-        }
-        
+
         // Draw the rotate icon above the figure if it is selected
         var iconPosition = new PointF(bounds.Left + bounds.Width / 2 - (float)RotationIcon.Width / 2,
             bounds.Top - RotationIcon.Height - 7);
@@ -255,7 +257,7 @@ public class UnfinishedCustomFigure(PointF[] points, string name)
         var y = points.Average(p => p.Y);
         return new PointF(x, y);
     }
-    
+
     public void AddPoint(PointF point)
     {
         var newPoints = new PointF[Points.Length + 1];
@@ -263,7 +265,7 @@ public class UnfinishedCustomFigure(PointF[] points, string name)
         newPoints[^1] = point;
         Points = newPoints;
     }
-    
+
     public void RemoveLastPoint()
     {
         if (Points.Length <= 0) return;
@@ -271,7 +273,7 @@ public class UnfinishedCustomFigure(PointF[] points, string name)
         Array.Copy(Points, newPoints, Points.Length - 1);
         Points = newPoints;
     }
-    
+
     // Override the Draw method to draw the figure
     public override void Draw(Graphics g)
     {
@@ -281,17 +283,11 @@ public class UnfinishedCustomFigure(PointF[] points, string name)
             using var fillBrush = new SolidBrush(FillColor);
             g.FillPolygon(fillBrush, Points);
         }
-        
+
         var pen = new Pen(BorderColor);
         // Draw the lines between the points
-        for (var i = 0; i < Points.Length - 1; i++)
-        {
-            g.DrawLine(pen, Points[i], Points[i + 1]);
-        }
+        for (var i = 0; i < Points.Length - 1; i++) g.DrawLine(pen, Points[i], Points[i + 1]);
         // Draw the points as small circles
-        foreach (var point in Points)
-        {
-            g.FillEllipse(Brushes.Red, point.X - 2, point.Y - 2, 5, 5);
-        }
+        foreach (var point in Points) g.FillEllipse(Brushes.Red, point.X - 2, point.Y - 2, 5, 5);
     }
 }

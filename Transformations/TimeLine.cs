@@ -18,19 +18,26 @@ public class TimeLine(
     private const int FrameHeightSecond = 24; // height of line for each second
     private const int Padding = 10;
     private readonly int _totalFrames = fps * duration;
-    public int CurrentFrame;
-    private bool _isAtPlayHead;
-    private bool _isAtKeyFrame;
-    private bool _isAtAddKeyFrameIcon;
-    private bool _isDraggingPlayHead;
-    private bool _isDraggingKeyFrame;
-    private bool _isPlaying;
-    private KeyFrame? _draggedKeyFrame;
-    private int _oldDraggedKeyFrame;
     public readonly List<KeyFrame?> KeyFrames = [];
-    
-    public bool CanReset() => KeyFrames.Count > 0;
-    public bool CanPlay() => KeyFrames.Count > 1;
+    private KeyFrame? _draggedKeyFrame;
+    private bool _isAtAddKeyFrameIcon;
+    private bool _isAtKeyFrame;
+    private bool _isAtPlayHead;
+    private bool _isDraggingKeyFrame;
+    private bool _isDraggingPlayHead;
+    private bool _isPlaying;
+    private int _oldDraggedKeyFrame;
+    public int CurrentFrame;
+
+    public bool CanReset()
+    {
+        return KeyFrames.Count > 0;
+    }
+
+    public bool CanPlay()
+    {
+        return KeyFrames.Count > 1;
+    }
 
     private void AddKeyFrame(int frame)
     {
@@ -43,11 +50,11 @@ public class TimeLine(
             IsNewOperation = true
         };
         addKeyFrameOperation.Execute(canvas);
-        
+
         canvas.UndoStack.Push(addKeyFrameOperation);
-        
+
         form.UpdateButtonStates();
-        
+
         Draw();
     }
 
@@ -61,7 +68,7 @@ public class TimeLine(
         CurrentFrame = frame;
         Draw();
     }
-    
+
     public void MoveCursorLeft()
     {
         // If there are available frames to move to
@@ -69,10 +76,10 @@ public class TimeLine(
         CurrentFrame--;
         var clientPoint = pictureBox.PointToClient(Cursor.Position);
         HandleCursorChange(new MouseEventArgs(MouseButtons.None, 0, clientPoint.X, clientPoint.Y, 0));
-        
+
         Draw();
     }
-    
+
     public void MoveCursorRight()
     {
         // If there are available frames to move to
@@ -82,7 +89,7 @@ public class TimeLine(
         HandleCursorChange(new MouseEventArgs(MouseButtons.None, 0, clientPoint.X, clientPoint.Y, 0));
         Draw();
     }
-    
+
     private void MoveCursorToStart()
     {
         CurrentFrame = 0;
@@ -92,10 +99,10 @@ public class TimeLine(
     {
         // Check if the new frame is already occupied by another keyframe
         if (KeyFrames.Any(kf => kf != null && kf.Frame == newFrame)) return;
-        
+
         // Move the keyframe to the new frame
         keyFrame.Frame = newFrame;
-        
+
         Draw();
     }
 
@@ -104,7 +111,7 @@ public class TimeLine(
         var isStartKeyFrameAdded = false;
         var isEndKeyFrameAdded = false;
         _isPlaying = true;
-        
+
         // Sort the keyframes by their frame number
         KeyFrames.Sort((a, b) =>
         {
@@ -112,7 +119,7 @@ public class TimeLine(
             Debug.Assert(b != null, nameof(b) + " != null");
             return a.Frame.CompareTo(b.Frame);
         });
-        
+
         // Sort the keyframes by their frame number
         KeyFrames.Sort((a, b) =>
         {
@@ -126,7 +133,8 @@ public class TimeLine(
         {
             // If not, create a keyframe at the beginning with the same figures as the next keyframe
             var nextKeyFrame = KeyFrames[0];
-            var startKeyFrame = new KeyFrame(0) { Figures = nextKeyFrame!.Figures!.Select(f => f.Clone()).ToList(), IsVisible = false };
+            var startKeyFrame = new KeyFrame(0)
+                { Figures = nextKeyFrame!.Figures!.Select(f => f.Clone()).ToList(), IsVisible = false };
             KeyFrames.Insert(0, startKeyFrame);
             isStartKeyFrameAdded = true;
         }
@@ -136,19 +144,20 @@ public class TimeLine(
         {
             // If not, create a keyframe at the end with the same figures as the last keyframe
             var lastKeyFrame = KeyFrames[^1];
-            var endKeyFrame = new KeyFrame(_totalFrames) { Figures = lastKeyFrame!.Figures!.Select(f => f.Clone()).ToList(), IsVisible = false };
+            var endKeyFrame = new KeyFrame(_totalFrames)
+                { Figures = lastKeyFrame!.Figures!.Select(f => f.Clone()).ToList(), IsVisible = false };
             KeyFrames.Add(endKeyFrame);
             isEndKeyFrameAdded = true;
         }
-        
+
         // Disable the buttons on the form
         form.DisableButtons();
-        
+
         form.addFigureCheckBox.Checked = false;
-        
+
         // Disable mouse events on the canvas
         canvasPictureBox.Enabled = false;
-        
+
         // Iterate over each pair of consecutive keyframes
         for (var i = 0; i < KeyFrames.Count - 1; i++)
         {
@@ -175,27 +184,27 @@ public class TimeLine(
 
                 // Calculate the interpolation factor
                 var t = (float)frame / segmentFrames;
-                
+
                 // Apply the easing function to the interpolation factor
                 t = t < 0.5 ? 4 * t * t * t : (t - 1) * (2 * t - 2) * (2 * t - 2) + 1;
-                
+
                 // Clear the canvas before drawing the interpolated figures
                 canvasGraphics.Clear(Color.Black);
 
                 // Interpolate between the states of the figures in the two keyframes
                 foreach (var startFigureName in startFiguresDict?.Keys!)
                 {
-                    var startFigure = startFiguresDict[startFigureName].Clone();  // Create a copy of the startFigure
-                    
+                    var startFigure = startFiguresDict[startFigureName].Clone(); // Create a copy of the startFigure
+
                     // If the end keyframe does not contain a figure with the same name, continue to the next figure
                     if (!endFiguresDict!.ContainsKey(startFigureName)) continue;
 
-                    var endFigure = endFiguresDict[startFigureName].Clone();  // Create a copy of the endFigure
-                    
+                    var endFigure = endFiguresDict[startFigureName].Clone(); // Create a copy of the endFigure
+
                     // Interpolate the size (scaling) of the figure
                     var startBounds = startFigure.GetBounds();
                     RectangleF endBounds;
-                    
+
                     // If the figures angle is not the same, correct the end figure to get the right bounds
                     if (Math.Abs(startFigure.RotationAngle - endFigure.RotationAngle) > 0.00005)
                     {
@@ -209,27 +218,21 @@ public class TimeLine(
                     {
                         endBounds = endFigure.GetBounds();
                     }
-                    
+
                     var interpolatedBounds = Interpolate(startBounds, endBounds, t);
-                    
+
                     // Apply interpolated bounds to the figure
                     startFigure.SetBounds(interpolatedBounds);
-                    
+
                     // Apply flips based on flags and threshold
-                    if (startFigure.HasFlippedX != endFigure.HasFlippedX && t > 0.5) 
-                    {
-                        startFigure.Flip(true, false); 
-                    }
-                    if (startFigure.HasFlippedY != endFigure.HasFlippedY && t > 0.5) 
-                    {
-                        startFigure.Flip(false, true); 
-                    }
+                    if (startFigure.HasFlippedX != endFigure.HasFlippedX && t > 0.5) startFigure.Flip(true, false);
+                    if (startFigure.HasFlippedY != endFigure.HasFlippedY && t > 0.5) startFigure.Flip(false, true);
 
                     // Interpolate the position (translation) of the figure
                     var dx = (endFigure.Pivot.X - startFigure.Pivot.X) * t;
                     var dy = (endFigure.Pivot.Y - startFigure.Pivot.Y) * t;
                     startFigure.Translate(dx, dy);
-                    
+
                     // Interpolate the rotation of the figure
                     var startAngle = startFigure.RotationAngle;
                     var endAngle = endFigure.RotationAngle;
@@ -265,17 +268,11 @@ public class TimeLine(
                 await Task.Delay(delay);
             }
         }
-        
+
         // Remove the start and end keyframes if they were added
-        if (isStartKeyFrameAdded)
-        {
-            KeyFrames.RemoveAt(0);
-        }
-        if (isEndKeyFrameAdded)
-        {
-            KeyFrames.RemoveAt(KeyFrames.Count - 1);
-        }
-        
+        if (isStartKeyFrameAdded) KeyFrames.RemoveAt(0);
+        if (isEndKeyFrameAdded) KeyFrames.RemoveAt(KeyFrames.Count - 1);
+
         // Regain control of the form and the canvas
         canvasGraphics.Clear(Color.Black);
         canvasPictureBox.Enabled = true;
@@ -293,7 +290,7 @@ public class TimeLine(
         var b = (int)(start.B + t * (end.B - start.B));
         return Color.FromArgb(a, r, g, b);
     }
-    
+
     private static RectangleF Interpolate(RectangleF startBounds, RectangleF endBounds, float t)
     {
         var interpolatedX = startBounds.X + (endBounds.X - startBounds.X) * t;
@@ -307,10 +304,10 @@ public class TimeLine(
     public void Reset()
     {
         KeyFrames.Clear();
-        
+
         // Move the cursor to the start
         MoveCursorToStart();
-        
+
         // Draw the timeline
         Draw();
     }
@@ -322,28 +319,28 @@ public class TimeLine(
             HandlePlayHeadDragging(e);
             return;
         }
-        
+
         if (_isDraggingKeyFrame)
         {
             HandleKeyFrameDragging(e);
             return;
         }
-        
+
         HandleCursorChange(e);
     }
-    
+
     private void HandlePlayHeadDragging(MouseEventArgs e)
     {
         var frameWidth = (float)(pictureBox.Width - 2 * Padding) / _totalFrames;
         var cursorX = e.Location.X;
         var frame = (int)((cursorX - Padding) / frameWidth);
-        
+
         // Ensure the frame number is within the valid range
         frame = Math.Max(0, Math.Min(frame, _totalFrames));
-        
+
         MoveCursor(frame);
     }
-    
+
     private void HandleKeyFrameDragging(MouseEventArgs e)
     {
         if (_draggedKeyFrame == null) return;
@@ -351,14 +348,14 @@ public class TimeLine(
         var frameWidth = (float)(pictureBox.Width - 2 * Padding) / _totalFrames;
         var cursorX = e.Location.X;
         var newFrame = (int)((cursorX - Padding) / frameWidth);
-        
+
         // Ensure the frame number is within the valid range
         newFrame = Math.Max(0, Math.Min(newFrame, _totalFrames));
-        
+
         // Find the keyframe at the current cursor position
         MoveKeyFrame(_draggedKeyFrame, newFrame);
     }
-    
+
     private void HandleCursorChange(MouseEventArgs e)
     {
         if (IsCursorAtPlayHead(e.Location))
@@ -369,7 +366,7 @@ public class TimeLine(
             _isAtKeyFrame = false;
             return;
         }
-        
+
         if (IsCursorAtAddKeyFrameIcon(e.Location))
         {
             pictureBox.Cursor = Cursors.Hand;
@@ -387,13 +384,13 @@ public class TimeLine(
             _isAtKeyFrame = true;
             return;
         }
-        
+
         pictureBox.Cursor = Cursors.Default;
         _isAtPlayHead = false;
         _isAtAddKeyFrameIcon = false;
         _isAtKeyFrame = false;
     }
-    
+
     private bool IsCursorAtPlayHead(Point cursorLocation)
     {
         var frameWidth = (float)(pictureBox.Width - 2 * Padding) / _totalFrames;
@@ -402,7 +399,7 @@ public class TimeLine(
 
         return playHeadRectangle.Contains(cursorLocation);
     }
-    
+
     private bool IsCursorAtAddKeyFrameIcon(Point cursorLocation)
     {
         var iconX = pictureBox.Width - 12 - Padding;
@@ -411,7 +408,7 @@ public class TimeLine(
 
         return addKeyFrameIconRectangle.Contains(cursorLocation);
     }
-    
+
     private bool IsCursorAtKeyFrame(Point cursorLocation)
     {
         var frameWidth = (float)(pictureBox.Width - 2 * Padding) / _totalFrames;
@@ -423,7 +420,12 @@ public class TimeLine(
             if (keyFrame != null)
             {
                 var x = keyFrame.Frame * frameWidth + Padding;
-                var diamondPoints = new[] { new PointF(x - halfDiamondWidth, middleY), new PointF(x, middleY + halfDiamondWidth), new PointF(x + halfDiamondWidth, middleY), new PointF(x, middleY - halfDiamondWidth), new PointF(x - halfDiamondWidth, middleY) };
+                var diamondPoints = new[]
+                {
+                    new PointF(x - halfDiamondWidth, middleY), new PointF(x, middleY + halfDiamondWidth),
+                    new PointF(x + halfDiamondWidth, middleY), new PointF(x, middleY - halfDiamondWidth),
+                    new PointF(x - halfDiamondWidth, middleY)
+                };
                 using var path = new GraphicsPath();
                 path.AddPolygon(diamondPoints);
 
@@ -437,7 +439,7 @@ public class TimeLine(
 
         return false;
     }
-    
+
     public void HandleClick()
     {
         if (_isDraggingKeyFrame)
@@ -445,38 +447,37 @@ public class TimeLine(
             HandleKeyFrameDragOnClick();
             return;
         }
-        
-        if (_isAtAddKeyFrameIcon)
-        {
-            HandleAddKeyFrameOnClick();
-        }
+
+        if (_isAtAddKeyFrameIcon) HandleAddKeyFrameOnClick();
     }
-    
+
     private void HandleKeyFrameDragOnClick()
     {
         if (_draggedKeyFrame == null) return;
         var keyFrame = _draggedKeyFrame;
-        
+
         var changeKeyFrameOperation = new ChangeKeyFrameOperation(keyFrame, this, _oldDraggedKeyFrame, keyFrame.Frame)
         {
             IsNewOperation = true
         };
         changeKeyFrameOperation.Execute(canvas);
-        
+
         canvas.UndoStack.Push(changeKeyFrameOperation);
-        
+
         form.UpdateButtonStates();
-        
+
         Draw();
     }
-    
+
     private void HandleAddKeyFrameOnClick()
     {
         if (!CanAddKeyFrame())
         {
-            MessageBox.Show(@"Cannot add a key frame at the current frame.", @"Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(@"Cannot add a key frame at the current frame.", @"Error", MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
             return;
         }
+
         AddKeyFrame(CurrentFrame);
         Draw();
     }
@@ -488,36 +489,35 @@ public class TimeLine(
             _isDraggingPlayHead = true;
             return;
         }
-        if (_isAtKeyFrame)
-        {
-            _isDraggingKeyFrame = true;
-        }
+
+        if (_isAtKeyFrame) _isDraggingKeyFrame = true;
     }
-    
+
     public void HandleMouseUp()
     {
         _isDraggingPlayHead = false;
         _isDraggingKeyFrame = false;
         _draggedKeyFrame = null;
         _oldDraggedKeyFrame = 0;
-        
+
         Draw();
     }
 
     public void Draw()
     {
         timeLineGraphics.Clear(pictureBox.BackColor);
-        
+
         var frameWidth = (float)(pictureBox.Width - 2 * Padding) / _totalFrames;
-        
+
         for (var frame = 0; frame < _totalFrames + 1; frame++)
         {
             var x = frame * frameWidth + Padding;
-            
+
             DrawFrameLine(frame, x);
 
-            if (KeyFrames.All(kf => kf != null && kf.Frame != frame || !kf!.IsVisible)) continue; // if the frame is a keyframe
-            
+            if (KeyFrames.All(kf => (kf != null && kf.Frame != frame) || !kf!.IsVisible))
+                continue; // if the frame is a keyframe
+
             // draw a diamond at the middle of the PictureBox at the cursor
             var middleY = pictureBox.Height / 2;
             var halfDiamondWidth = frameWidth / 2;
@@ -534,19 +534,16 @@ public class TimeLine(
 
         // Draw the play head at the current frame
         DrawPlayHead(frameWidth, Padding);
-        
+
         // Draw the add key frame icon
         DrawAddKeyFrameIcon(Padding);
-        
+
         // Refresh the PictureBox
         pictureBox.Invalidate();
 
-        if (!_isPlaying)
-        {
-            form.UpdateTimeLineButtonStates();
-        }
+        if (!_isPlaying) form.UpdateTimeLineButtonStates();
     }
-    
+
     private void DrawFrameLine(int frame, float x)
     {
         int frameHeight;
@@ -566,9 +563,10 @@ public class TimeLine(
             frameHeight = FrameHeightOdd;
             pen = new Pen(Color.Gray);
         }
+
         timeLineGraphics.DrawLine(pen, x, 0, x, frameHeight);
     }
-    
+
     private void DrawPlayHead(float frameWidth, int padding)
     {
         var cursorX = CurrentFrame * frameWidth + padding;
@@ -577,7 +575,7 @@ public class TimeLine(
 
         // Draw the marker at the top of the play head
         // Draw a rectangle
-        const int rectangleHeight = 5; 
+        const int rectangleHeight = 5;
         timeLineGraphics.FillRectangle(Brushes.Red, cursorX - 5, 0, 10, rectangleHeight);
 
         // Draw a downward-facing triangle
@@ -585,11 +583,11 @@ public class TimeLine(
         {
             new PointF(cursorX - 5, 0 + rectangleHeight), // left point
             new PointF(cursorX + 5, 0 + rectangleHeight), // right point
-            new PointF(cursorX, 0 + rectangleHeight + 10)  // bottom point
+            new PointF(cursorX, 0 + rectangleHeight + 10) // bottom point
         };
         timeLineGraphics.FillPolygon(Brushes.Red, trianglePoints);
     }
-    
+
     private void DrawAddKeyFrameIcon(int padding)
     {
         // Draw the icon in the bottom right corner of the PictureBox
@@ -605,7 +603,7 @@ public class TimeLine(
             new PointF(iconX, iconY + 6)
         };
         timeLineGraphics.FillPolygon(Brushes.White, keyFramePoints);
-        
+
         const string text = "Add KeyFrame";
         var font = new Font("Segoe UI", 9);
         var brush = Brushes.White;

@@ -1,29 +1,30 @@
 namespace Transformations;
+
 public partial class Form1 : Form
 {
-    private TimeLine? _timeLine;
-    private UnfinishedCustomFigure _unfinishedCustomFigure = null!;
     private readonly Canvas _canvas;
     private readonly Graphics _g;
-    private readonly Graphics _timeLineGraphics;
     private readonly Point _originalAddButtonLocation;
     private readonly Point _originalBorderColorButtonLocation;
     private readonly Point _originalFillColorButtonLocation;
-    private bool _isAddFigureModeActive;
-    private bool _isAddCustomFigureModeActive;
-    private bool _isDragging;
-    private bool _isDraggingPivot;
-    private bool _isTranslating;
-    private bool _isResizing;
-    private bool _isRotating;
+    private readonly Graphics _timeLineGraphics;
     private Color _borderColor;
+    private Point _currentMouseLocation;
+    private ResizePosition _currentResizePosition;
     private Color _fillColor;
     private Point _initialMouseLocation;
-    private Point _currentMouseLocation;
+    private bool _isAddCustomFigureModeActive;
+    private bool _isAddFigureModeActive;
+    private bool _isDragging;
+    private bool _isDraggingPivot;
+    private bool _isResizing;
+    private bool _isRotating;
+    private bool _isTranslating;
     private RectangleF _originalBox;
     private List<Figure>? _tempSelectedFigures;
-    private ResizePosition _currentResizePosition;
-    
+    private TimeLine? _timeLine;
+    private UnfinishedCustomFigure _unfinishedCustomFigure = null!;
+
     public Form1()
     {
         // Initialize components and set up the drawing environment.
@@ -35,7 +36,7 @@ public partial class Form1 : Form
         var timeLineBmp = new Bitmap(timeLinePictureBox.Width, timeLinePictureBox.Height);
         _timeLineGraphics = Graphics.FromImage(timeLineBmp);
         timeLinePictureBox.Image = timeLineBmp;
-        
+
         _canvas = new Canvas();
         _originalAddButtonLocation = addFigureButton.Location;
         _originalBorderColorButtonLocation = borderColorButton.Location;
@@ -66,7 +67,7 @@ public partial class Form1 : Form
         sizeTextBox.Text = @"1";
         positionXTextBox.Text = @"100";
         positionYTextBox.Text = @"100";
-        
+
         // Select all figures by default.
         selectAllCheckBox.Checked = false;
 
@@ -83,24 +84,21 @@ public partial class Form1 : Form
         Canvas.Render(_g, canvasPictureBox);
         _canvas.RenderFigures(_g);
     }
-    
+
     private void AddCustomFigureCheckBox_CheckedChanged(object? sender, EventArgs e)
     {
         // Set the boolean field to the state of the addCustomFigureCheckBox.
         _isAddCustomFigureModeActive = addCustomFigureCheckBox.Checked;
-        
+
         // If add figure mode is active, disable the addFigureCheckBox.
         if (_isAddFigureModeActive)
         {
             addFigureCheckBox.Checked = false;
             addFigureCheckBox_CheckedChanged(this, EventArgs.Empty);
         }
-        
-        if (_timeLine != null)
-        {
-            playTimeLineButton.Visible = !_isAddCustomFigureModeActive;
-        }
-        
+
+        if (_timeLine != null) playTimeLineButton.Visible = !_isAddCustomFigureModeActive;
+
         // Update the visibility of the controls based on the state of the addCustomFigureCheckBox.
         var invisibleControls = new List<Control>
         {
@@ -113,23 +111,20 @@ public partial class Form1 : Form
         };
         SetControlVisibility(invisibleControls, _isAddCustomFigureModeActive);
         SetControlVisibility(visibleControls, !_isAddCustomFigureModeActive);
-        
+
         // Change the cursor based on the state of the addCustomFigureCheckBox.
         canvasPictureBox.Cursor = _isAddCustomFigureModeActive ? Cursors.Cross : Cursors.Default;
 
         // Change the background color based on the state of the addCustomFigureCheckBox.
-        BackColor = _isAddCustomFigureModeActive ? Color.Black : Color.FromArgb(10,10, 20);
-        
+        BackColor = _isAddCustomFigureModeActive ? Color.Black : Color.FromArgb(10, 10, 20);
+
         DisableFigureSelection();
         UpdateAllButtonStates();
     }
-    
+
     private static void SetControlVisibility(List<Control> controls, bool visibility)
     {
-        foreach (var control in controls)
-        {
-            control.Visible = visibility;
-        }
+        foreach (var control in controls) control.Visible = visibility;
     }
 
     private void FiguresCheckedListBox_ItemCheck(object? sender, ItemCheckEventArgs e)
@@ -144,14 +139,14 @@ public partial class Form1 : Form
 
         // Select or deselect the figure based on the new check state
         figure.IsSelected = e.NewValue == CheckState.Checked;
-        
+
         // Update the check state
         UpdateSelectAllCheckBox();
 
         // Render the canvas
         RenderFigures();
     }
-    
+
     private void UpdateSelectAllCheckBox()
     {
         // Check if all figures are selected
@@ -160,11 +155,11 @@ public partial class Form1 : Form
         // Update the Checked property of the selectAllCheckBox
         selectAllCheckBox.Checked = allChecked;
     }
-    
+
     private void CanvasPictureBoxMouseMove(object? sender, MouseEventArgs e)
     {
         UpdateCoordinatesLabel(e);
-        
+
         // Check if a figure is selected
         var selectedFigures = _canvas.Figures.Where(f => f.IsSelected).ToList();
         if (selectedFigures.Count == 0)
@@ -172,56 +167,50 @@ public partial class Form1 : Form
             canvasPictureBox.Cursor = Cursors.Default;
             return;
         }
-        
+
         if (_isDraggingPivot)
         {
             HandlePivotDragging(e);
             return;
         }
-        
+
         if (_isDragging)
         {
             HandleDragging(e);
             return;
         }
-        
+
         HandleCursorChange(selectedFigures, e);
     }
-    
+
     private void UpdateCoordinatesLabel(MouseEventArgs e)
     {
         coordinatesLabel.Text = $@"X: {e.X}, Y: {e.Y}";
     }
-    
+
     private void HandlePivotDragging(MouseEventArgs e)
     {
         // Create a move pivot operation for each selected figure
         if (_tempSelectedFigures == null) return;
-        
+
         var operations = _tempSelectedFigures.Where(f => f.IsSelected)
             .Select(figure => new MovePivotOperation(figure, e.Location) { IsNewOperation = false })
             .Cast<CanvasOperation>().ToList();
-        
+
         // Execute the operation
         var batchOperation = new BatchCanvasOperation(operations);
         batchOperation.Execute(_canvas);
-        
+
         // Render the canvas
         Canvas.Render(_g, canvasPictureBox);
-        
+
         // Render all figures that are not selected (in the background)
-        foreach (var figure in _canvas.Figures.Where(f => !f.IsSelected))
-        {
-            figure.Draw(_g);
-        }
-        
+        foreach (var figure in _canvas.Figures.Where(f => !f.IsSelected)) figure.Draw(_g);
+
         // Render the temporary figures
-        foreach (var figure in _tempSelectedFigures)
-        {
-            figure.Draw(_g);
-        }
+        foreach (var figure in _tempSelectedFigures) figure.Draw(_g);
     }
-    
+
     private void HandleDragging(MouseEventArgs e)
     {
         if (_isTranslating)
@@ -236,12 +225,9 @@ public partial class Form1 : Form
             return;
         }
 
-        if (_isRotating)
-        {
-            HandleRotationDragging(e);
-        }
+        if (_isRotating) HandleRotationDragging(e);
     }
-    
+
     private void HandleTranslationDragging(MouseEventArgs e)
     {
         // Calculate the translation vector
@@ -250,64 +236,50 @@ public partial class Form1 : Form
 
         // Translate each temporary figure
         if (_tempSelectedFigures == null) return;
-        foreach (var figure in _tempSelectedFigures)
-        {
-            figure.Translate(dx, dy);
-        }
+        foreach (var figure in _tempSelectedFigures) figure.Translate(dx, dy);
 
         // Update the current mouse location
         _currentMouseLocation = e.Location;
 
         // Render the canvas
         Canvas.Render(_g, canvasPictureBox);
-            
+
         // Render all figures that are not selected (in the background)
-        foreach (var figure in _canvas.Figures.Where(f => !f.IsSelected))
-        {
-            figure.Draw(_g);
-        }
-        
+        foreach (var figure in _canvas.Figures.Where(f => !f.IsSelected)) figure.Draw(_g);
+
         // Render the temporary figures
-        foreach (var figure in _tempSelectedFigures)
-        {
-            figure.Draw(_g);
-        }
+        foreach (var figure in _tempSelectedFigures) figure.Draw(_g);
     }
-    
+
     private void HandleResizeDragging(MouseEventArgs e)
     {
         // Create a resize operation for each selected figure
         if (_tempSelectedFigures == null) return;
-        
+
         var operations = _tempSelectedFigures.Where(f => f.IsSelected)
-            .Select(figure => new ResizeFigureOperation(figure, _currentResizePosition, _originalBox, e.Location) { IsNewOperation = false })
+            .Select(figure => new ResizeFigureOperation(figure, _currentResizePosition, _originalBox, e.Location)
+                { IsNewOperation = false })
             .Cast<CanvasOperation>().ToList();
-        
+
         // Execute the operation
         var batchOperation = new BatchCanvasOperation(operations);
         batchOperation.Execute(_canvas);
-        
+
         // Render the canvas
         Canvas.Render(_g, canvasPictureBox);
-        
+
         // Render all figures that are not selected (in the background)
-        foreach (var figure in _canvas.Figures.Where(f => !f.IsSelected))
-        {
-            figure.Draw(_g);
-        }
-        
+        foreach (var figure in _canvas.Figures.Where(f => !f.IsSelected)) figure.Draw(_g);
+
         // Render the temporary figures
-        foreach (var figure in _tempSelectedFigures)
-        {
-            figure.Draw(_g);
-        }
+        foreach (var figure in _tempSelectedFigures) figure.Draw(_g);
     }
-    
+
     private void HandleRotationDragging(MouseEventArgs e)
     {
         // Get the center of the figure to be rotated
         var center = _canvas.Figures.First(f => f.IsRotating).GetCenter();
-        
+
         // Calculate the vector from the center of the figure to the cursor's position
         var dx = e.X - center.X;
         var dy = e.Y - center.Y;
@@ -316,31 +288,25 @@ public partial class Form1 : Form
 
         // Create a rotate operation for each selected figure (clone it first)
         _tempSelectedFigures?.Clear();
-        
+
         _tempSelectedFigures = _canvas.Figures.Where(f => f.IsSelected).Select(f => f.Clone()).ToList();
-        
+
         var operations = _tempSelectedFigures
             .Select(figure => new RotateFigureOperation(figure, angle) { IsNewOperation = false })
             .Cast<CanvasOperation>().ToList();
-        
+
         // Execute the operation
         var batchOperation = new BatchCanvasOperation(operations);
         batchOperation.Execute(_canvas);
-        
+
         // Render the canvas
         Canvas.Render(_g, canvasPictureBox);
-        
+
         // Render all figures that are not selected (in the background)
-        foreach (var figure in _canvas.Figures.Where(f => !f.IsSelected))
-        {
-            figure.Draw(_g);
-        }
-        
+        foreach (var figure in _canvas.Figures.Where(f => !f.IsSelected)) figure.Draw(_g);
+
         // Render the temporary figures
-        foreach (var figure in _tempSelectedFigures)
-        {
-            figure.Draw(_g);
-        }
+        foreach (var figure in _tempSelectedFigures) figure.Draw(_g);
     }
 
     private static double GetRotationAngle(float dy, float dx)
@@ -382,7 +348,7 @@ public partial class Form1 : Form
                 canvasPictureBox.Cursor = Cursors.Hand;
                 return;
             }
-            
+
             // Check if the cursor is inside the rotation icon
             if (IsInsideRotationIcon(figure, e.Location))
             {
@@ -412,11 +378,12 @@ public partial class Form1 : Form
                 canvasPictureBox.Cursor = GetCursorForSide(figure.GetBounds(), e.Location);
                 return;
             }
+
             figure.IsRotating = false;
         }
-        
+
         _isRotating = false;
-        
+
         canvasPictureBox.Cursor = Cursors.Default;
     }
 
@@ -424,11 +391,11 @@ public partial class Form1 : Form
     {
         // Define a tolerance for how close the cursor needs to be to the pivot
         const float tolerance = 5;
-        
+
         // Check if the cursor is near the pivot point
         return Math.Abs(figure.Pivot.X - point.X) <= tolerance && Math.Abs(figure.Pivot.Y - point.Y) <= tolerance;
     }
-    
+
     private static bool IsInsideRotationIcon(Figure figure, PointF point)
     {
         // Calculate the position of the rotation icon
@@ -437,12 +404,13 @@ public partial class Form1 : Form
                 figure.GetBounds().Top - figure.RotationIcon.Height - 7);
 
         // Create a rectangle that represents the bounds of the rotation icon
-        var iconBounds = new RectangleF(iconPosition.X, iconPosition.Y, figure.RotationIcon.Width, figure.RotationIcon.Height);
+        var iconBounds = new RectangleF(iconPosition.X, iconPosition.Y, figure.RotationIcon.Width,
+            figure.RotationIcon.Height);
 
         // Check if the point is inside the rectangle
         return iconBounds.Contains(point);
     }
-    
+
     private static bool IsCursorAtCorner(RectangleF bounds, PointF point)
     {
         // Define a tolerance for how close the cursor needs to be to a corner
@@ -457,7 +425,8 @@ public partial class Form1 : Form
             new PointF(bounds.Right, bounds.Bottom)
         };
 
-        return corners.Any(corner => Math.Abs(corner.X - point.X) <= tolerance && Math.Abs(corner.Y - point.Y) <= tolerance);
+        return corners.Any(corner =>
+            Math.Abs(corner.X - point.X) <= tolerance && Math.Abs(corner.Y - point.Y) <= tolerance);
     }
 
     private Cursor GetCursorForCorner(RectangleF bounds, PointF point)
@@ -488,7 +457,6 @@ public partial class Form1 : Form
             return Cursors.Default;
         _currentResizePosition = ResizePosition.BottomLeft;
         return Cursors.SizeNESW;
-
     }
 
     private static bool IsCursorAtSide(RectangleF bounds, PointF point)
@@ -530,9 +498,8 @@ public partial class Form1 : Form
         if (!(Math.Abs(bounds.Bottom - point.Y) <= tolerance)) return Cursors.Default;
         _currentResizePosition = ResizePosition.BottomMiddle;
         return Cursors.SizeNS;
-
     }
-    
+
     private void CanvasPictureBoxClick(object? sender, MouseEventArgs e)
     {
         if (_isAddCustomFigureModeActive)
@@ -540,24 +507,25 @@ public partial class Form1 : Form
             HandleCustomFigureCreationOnClick(e);
             return;
         }
+
         if (_isDraggingPivot)
         {
             HandlePivotDragOnClick(e);
             return;
         }
-        
+
         if (_isDragging)
         {
             HandleFigureDragOnClick(e);
             return;
         }
-        
+
         HandleFigureSelection(e);
-        
+
         // Update the button states
         UpdateButtonStates();
     }
-    
+
     private void HandleCustomFigureCreationOnClick(MouseEventArgs e)
     {
         if (_canvas.CustomFigurePoints.Count == 0)
@@ -579,7 +547,7 @@ public partial class Form1 : Form
         // Redraw the custom figure.
         RedrawCustomFigure();
     }
-    
+
     private void RedrawCustomFigure()
     {
         // If the addCustomFigureCheckBox is not checked return.
@@ -587,7 +555,7 @@ public partial class Form1 : Form
 
         // Clear the canvas and re-render the figures.
         _g.Clear(Color.Transparent);
-        
+
         // Render the figures
         RenderFigures();
 
@@ -595,7 +563,7 @@ public partial class Form1 : Form
         UpdateCustomFigureButtonStates();
         canvasPictureBox.Refresh();
     }
-    
+
     private void HandlePivotDragOnClick(MouseEventArgs e)
     {
         // Create a move pivot operation for each selected figure
@@ -607,14 +575,14 @@ public partial class Form1 : Form
         var batchOperation = new BatchCanvasOperation(operations);
         batchOperation.Execute(_canvas);
         _canvas.UndoStack.Push(batchOperation);
-        
+
         // Render the figures
         RenderFigures();
-        
+
         // Update the button states
         UpdateAllButtonStates();
     }
-    
+
     private void HandleFigureDragOnClick(MouseEventArgs e)
     {
         if (canvasPictureBox.Cursor == Cursors.SizeAll)
@@ -622,19 +590,16 @@ public partial class Form1 : Form
             TranslateSelectedFigures(e);
             return;
         }
-        
+
         if (canvasPictureBox.Cursor == Cursors.Hand && _isRotating)
         {
             RotateSelectedFigures(e);
             return;
         }
 
-        if (canvasPictureBox.Cursor != Cursors.Default)
-        {
-            ResizeSelectedFigures(e);
-        }
+        if (canvasPictureBox.Cursor != Cursors.Default) ResizeSelectedFigures(e);
     }
-    
+
     private void RotateSelectedFigures(MouseEventArgs e)
     {
         // Get the center of the figure to be rotated
@@ -656,14 +621,14 @@ public partial class Form1 : Form
         var batchOperation = new BatchCanvasOperation(operations);
         batchOperation.Execute(_canvas);
         _canvas.UndoStack.Push(batchOperation);
-        
+
         // Render the figures
         RenderFigures();
-        
+
         // Update the button states
         UpdateAllButtonStates();
     }
-    
+
     private void TranslateSelectedFigures(MouseEventArgs e)
     {
         // Calculate the translation vector
@@ -687,36 +652,37 @@ public partial class Form1 : Form
             _canvas.Figures.Remove(figure);
             _canvas.Figures.Add(figure);
         }
-        
+
         // Render the figures
         RenderFigures();
-        
+
         // Update the button states
         UpdateAllButtonStates();
     }
-    
+
     private void ResizeSelectedFigures(MouseEventArgs e)
     {
         // Create a resize operation for each selected figure
         var operations = _canvas.Figures.Where(f => f.IsSelected)
-            .Select(figure => new ResizeFigureOperation(figure, _currentResizePosition, _originalBox, e.Location) { IsNewOperation = true })
+            .Select(figure => new ResizeFigureOperation(figure, _currentResizePosition, _originalBox, e.Location)
+                { IsNewOperation = true })
             .Cast<CanvasOperation>().ToList();
-        
+
         // Execute the batch operation and push it to the undo stack
         var batchOperation = new BatchCanvasOperation(operations);
         batchOperation.Execute(_canvas);
         _canvas.UndoStack.Push(batchOperation);
-        
+
         // Update the initial mouse location
         _initialMouseLocation = e.Location;
-        
+
         // Render the figures
         RenderFigures();
-        
+
         // Update the button states
         UpdateAllButtonStates();
     }
-    
+
     private void HandleFigureSelection(MouseEventArgs e)
     {
         // Check if a figure is clicked
@@ -724,10 +690,7 @@ public partial class Form1 : Form
         if (clickedFigure == null)
         {
             // If no figure is clicked, deselect all figures and uncheck all checkboxes
-            foreach (var figure in _canvas.Figures)
-            {
-                SetFigureSelection(figure, false);
-            }
+            foreach (var figure in _canvas.Figures) SetFigureSelection(figure, false);
         }
         else
         {
@@ -740,10 +703,7 @@ public partial class Form1 : Form
             else
             {
                 // If neither key is being held down, deselect all other figures before selecting the clicked figure
-                foreach (var figure in _canvas.Figures)
-                {
-                    SetFigureSelection(figure, false);
-                }
+                foreach (var figure in _canvas.Figures) SetFigureSelection(figure, false);
                 SetFigureSelection(clickedFigure, true);
             }
         }
@@ -754,27 +714,24 @@ public partial class Form1 : Form
         // Render the figures
         RenderFigures();
     }
-    
+
     private void SetFigureSelection(Figure figure, bool isSelected)
     {
         figure.IsSelected = isSelected;
 
         // Find the corresponding item in FiguresCheckBoxList and update its checked state
         FindCorrectItem(figure.Name, isSelected);
-        
+
         // Update button visibility
         UpdateButtonVisibilityBasedOnSelection();
     }
-    
+
     private void FindCorrectItem(string name, bool isSelected)
     {
         var index = figuresCheckedListBox.Items.IndexOf(name);
-        if (index != -1)
-        {
-            figuresCheckedListBox.SetItemChecked(index, isSelected);
-        }
+        if (index != -1) figuresCheckedListBox.SetItemChecked(index, isSelected);
     }
-    
+
     private void CanvasPictureBoxMouseDown(object? sender, MouseEventArgs e)
     {
         // Check if the cursor is not default or if no figure is selected
@@ -788,22 +745,19 @@ public partial class Form1 : Form
             var figureToOperateOn = _canvas.Figures.FirstOrDefault(f => IsCursorAtPivot(f, e.Location));
             if (figureToOperateOn != null)
             {
-                foreach (var figure in _canvas.Figures)
-                {
-                    figure.IsSelected = false;
-                }
+                foreach (var figure in _canvas.Figures) figure.IsSelected = false;
 
                 figureToOperateOn.IsSelected = true;
                 figureToOperateOn.PreviousResizePosition = _currentResizePosition;
             }
-            
+
             // Create a temporary list with the selected figure to be operated on
             _tempSelectedFigures = _canvas.Figures.Where(f => f.IsSelected).Select(f => f.Clone()).ToList();
-            
+
             _isDraggingPivot = true;
             return;
         }
-        
+
         // Else, set the dragging state to true and update the initial mouse location
         _isDragging = true;
         _initialMouseLocation = e.Location;
@@ -812,13 +766,10 @@ public partial class Form1 : Form
         // Check if we have a translation or rotation operation
         if (canvasPictureBox.Cursor == Cursors.SizeAll || _isRotating)
         {
-            if (!_isRotating)
-            {
-                _isTranslating = true;
-            }
+            if (!_isRotating) _isTranslating = true;
             // Create a temporary list of selected figures
             _tempSelectedFigures = _canvas.Figures.Where(f => f.IsSelected).Select(f => f.Clone()).ToList();
-            
+
             return;
         }
 
@@ -829,13 +780,11 @@ public partial class Form1 : Form
         if (!isResizeCursor) return;
         {
             // If a resize operation is about to be performed, deselect all other figures and select the figure to be resized where the mouse is clicked.
-            var figureToResize = _canvas.Figures.FirstOrDefault(f => IsCursorAtSide(f.GetBounds(), e.Location) || IsCursorAtCorner(f.GetBounds(), e.Location));
+            var figureToResize = _canvas.Figures.FirstOrDefault(f =>
+                IsCursorAtSide(f.GetBounds(), e.Location) || IsCursorAtCorner(f.GetBounds(), e.Location));
             if (figureToResize != null)
             {
-                foreach (var figure in _canvas.Figures)
-                {
-                    figure.IsSelected = false;
-                }
+                foreach (var figure in _canvas.Figures) figure.IsSelected = false;
                 figureToResize.IsSelected = true;
                 figureToResize.PreviousResizePosition = _currentResizePosition;
             }
@@ -849,7 +798,7 @@ public partial class Form1 : Form
             _isResizing = true;
         }
     }
-    
+
     private void CanvasPictureBoxMouseUp(object? sender, MouseEventArgs e)
     {
         _isDraggingPivot = false;
@@ -857,16 +806,16 @@ public partial class Form1 : Form
         _isTranslating = false;
         _isResizing = false;
         _isRotating = false;
-        
+
         // If the temporary list of selected figures is null, return
         if (_tempSelectedFigures == null) return;
         _tempSelectedFigures.Clear();
         _tempSelectedFigures = null;
-        
+
         // Update the button states
         UpdateAllButtonStates();
     }
-    
+
     private void AddCustomFigureButton_Click(object? sender, EventArgs e)
     {
         if (_canvas.CustomFigurePoints.Count < 3)
@@ -874,7 +823,7 @@ public partial class Form1 : Form
             MessageBox.Show(@"A custom figure must have at least 3 points.");
             return;
         }
-        
+
         // Remove the unfinished custom figure from the canvas
         _canvas.Figures.Remove(_unfinishedCustomFigure);
 
@@ -904,21 +853,18 @@ public partial class Form1 : Form
         // Clear the custom figure stacks
         _canvas.CustomFigureUndoStack.Clear();
         _canvas.CustomFigureRedoStack.Clear();
-        
+
         _unfinishedCustomFigure = null!;
-        
-        if (_timeLine != null)
-        {
-            playTimeLineButton.Visible = true;
-        }
-        
+
+        if (_timeLine != null) playTimeLineButton.Visible = true;
+
         // Render the figures
         RenderFigures();
 
         // Clear the list of points for the new custom figure
         _canvas.CustomFigurePoints.Clear();
     }
-    
+
     private void ResetCustomFigureButton_Click(object? sender, EventArgs e)
     {
         // Clear the list of points for the new custom figure
@@ -934,11 +880,11 @@ public partial class Form1 : Form
 
         // Update the button states
         UpdateCustomFigureButtonStates();
-        
+
         // Render the figures
         RenderFigures();
     }
-    
+
     private void CancelCustomFigureButton_Click(object? sender, EventArgs e)
     {
         // Clear the list of points for the new custom figure
@@ -957,7 +903,7 @@ public partial class Form1 : Form
         // Remove the unfinished custom figure from the canvas
         _canvas.Figures.Remove(_unfinishedCustomFigure);
         _unfinishedCustomFigure = null!;
-        
+
         // Render the figures
         RenderFigures();
     }
@@ -967,10 +913,7 @@ public partial class Form1 : Form
         UpdateCheckedListBox(() =>
         {
             // Deselect all other items in the figuresCheckedListBox
-            for (var i = 0; i < figuresCheckedListBox.Items.Count; i++)
-            {
-                figuresCheckedListBox.SetItemChecked(i, false);
-            }
+            for (var i = 0; i < figuresCheckedListBox.Items.Count; i++) figuresCheckedListBox.SetItemChecked(i, false);
 
             // Add the figure to the CheckedListBox and set it as checked
             figuresCheckedListBox.Items.Add(figure.Name, true);
@@ -992,7 +935,7 @@ public partial class Form1 : Form
     {
         // Uncheck the pivot checkbox
         customPivotCheckBox.Checked = false;
-        
+
         // Set the boolean field to the state of the addFigureCheckBox
         _isAddFigureModeActive = addFigureCheckBox.Checked;
 
@@ -1002,15 +945,15 @@ public partial class Form1 : Form
             addCustomFigureCheckBox.Checked = false;
             AddCustomFigureCheckBox_CheckedChanged(this, EventArgs.Empty);
         }
-        
+
         // Update the visibility of the controls based on the state of the addFigureCheckBox
         var controls = new List<Control>
         {
-            figuresComboBox, sizeLabel, sizeTextBox, positionLabel, positionXTextBox, positionYTextBox, 
+            figuresComboBox, sizeLabel, sizeTextBox, positionLabel, positionXTextBox, positionYTextBox,
             customPivotCheckBox, addFigureButton, borderColorButton, fillColorButton
         };
         SetControlVisibility(controls, _isAddFigureModeActive);
-        
+
         var isPivotAvailable = _isAddFigureModeActive && customPivotCheckBox.Checked;
         var pivotControls = new List<Control>
         {
@@ -1019,31 +962,38 @@ public partial class Form1 : Form
         SetControlVisibility(pivotControls, isPivotAvailable);
 
         // Update the location of the controls based on the state of the addFigureCheckBox
-        SetButtonLocation(borderColorButton, borderColorButton.Location with { Y = _isAddFigureModeActive ? _originalBorderColorButtonLocation.Y - 65 : _originalBorderColorButtonLocation.Y });
-        SetButtonLocation(fillColorButton, fillColorButton.Location with { Y = _isAddFigureModeActive ? _originalFillColorButtonLocation.Y - 65 : _originalFillColorButtonLocation.Y });
-        SetButtonLocation(addFigureButton, addFigureButton.Location with { Y = _isAddFigureModeActive ? _originalAddButtonLocation.Y - 65 : _originalAddButtonLocation.Y });
+        SetButtonLocation(borderColorButton,
+            borderColorButton.Location with
+            {
+                Y = _isAddFigureModeActive
+                    ? _originalBorderColorButtonLocation.Y - 65
+                    : _originalBorderColorButtonLocation.Y
+            });
+        SetButtonLocation(fillColorButton,
+            fillColorButton.Location with
+            {
+                Y = _isAddFigureModeActive
+                    ? _originalFillColorButtonLocation.Y - 65
+                    : _originalFillColorButtonLocation.Y
+            });
+        SetButtonLocation(addFigureButton,
+            addFigureButton.Location with
+            {
+                Y = _isAddFigureModeActive ? _originalAddButtonLocation.Y - 65 : _originalAddButtonLocation.Y
+            });
 
         // Only call DisableFigureSelection when the checkbox is checked
-        if (_isAddFigureModeActive)
-        {
-            DisableFigureSelection();
-        }
+        if (_isAddFigureModeActive) DisableFigureSelection();
     }
 
     private void DisableFigureSelection()
     {
         // Deselect all figures
-        foreach (var figure in _canvas.Figures)
-        {
-            figure.IsSelected = false;
-        }
+        foreach (var figure in _canvas.Figures) figure.IsSelected = false;
 
         // Uncheck all checkboxes
-        for (var i = 0; i < figuresCheckedListBox.Items.Count; i++)
-        {
-            figuresCheckedListBox.SetItemChecked(i, false);
-        }
-        
+        for (var i = 0; i < figuresCheckedListBox.Items.Count; i++) figuresCheckedListBox.SetItemChecked(i, false);
+
         // Update button visibility
         UpdateButtonVisibilityBasedOnSelection();
     }
@@ -1055,21 +1005,33 @@ public partial class Form1 : Form
         pivotOffsetXTextBox.Visible = isChecked;
         pivotOffsetYTextBox.Visible = isChecked;
 
-        SetButtonLocation(borderColorButton, borderColorButton.Location with { Y = isChecked ? _originalBorderColorButtonLocation.Y : _originalBorderColorButtonLocation.Y - 65 });
-        SetButtonLocation(fillColorButton, fillColorButton.Location with { Y = isChecked ? _originalFillColorButtonLocation.Y : _originalFillColorButtonLocation.Y - 65 });
-        SetButtonLocation(addFigureButton, addFigureButton.Location with { Y = isChecked ? _originalAddButtonLocation.Y : _originalAddButtonLocation.Y - 65 });
+        SetButtonLocation(borderColorButton,
+            borderColorButton.Location with
+            {
+                Y = isChecked ? _originalBorderColorButtonLocation.Y : _originalBorderColorButtonLocation.Y - 65
+            });
+        SetButtonLocation(fillColorButton,
+            fillColorButton.Location with
+            {
+                Y = isChecked ? _originalFillColorButtonLocation.Y : _originalFillColorButtonLocation.Y - 65
+            });
+        SetButtonLocation(addFigureButton,
+            addFigureButton.Location with
+            {
+                Y = isChecked ? _originalAddButtonLocation.Y : _originalAddButtonLocation.Y - 65
+            });
     }
-    
+
     private static void SetButtonLocation(Control button, Point location)
     {
         button.Location = location;
     }
-    
+
     private void borderColorCustomFigureButton_Click(object sender, EventArgs e)
     {
         if (borderColorDialog.ShowDialog() != DialogResult.OK) return;
         _borderColor = borderColorDialog.Color;
-        
+
         // Create a ChangeBorderColorOperation
         var operation = new ChangeBorderColorOperation(_unfinishedCustomFigure, _borderColor)
         {
@@ -1077,7 +1039,7 @@ public partial class Form1 : Form
         };
         operation.Execute(_canvas);
         _canvas.CustomFigureUndoStack.Push(operation);
-        
+
         RedrawCustomFigure();
     }
 
@@ -1085,7 +1047,7 @@ public partial class Form1 : Form
     {
         if (fillColorDialog.ShowDialog() != DialogResult.OK) return;
         _fillColor = fillColorDialog.Color;
-        
+
         // Create a ChangeFillColorOperation
         var operation = new ChangeFillColorOperation(_unfinishedCustomFigure, _fillColor)
         {
@@ -1093,24 +1055,18 @@ public partial class Form1 : Form
         };
         operation.Execute(_canvas);
         _canvas.CustomFigureUndoStack.Push(operation);
-        
+
         RedrawCustomFigure();
     }
 
     private void borderColorButton_Click(object sender, EventArgs e)
     {
-        if (borderColorDialog.ShowDialog() == DialogResult.OK)
-        {
-            _borderColor = borderColorDialog.Color;
-        }
+        if (borderColorDialog.ShowDialog() == DialogResult.OK) _borderColor = borderColorDialog.Color;
     }
 
     private void fillColorButton_Click(object sender, EventArgs e)
     {
-        if (fillColorDialog.ShowDialog() == DialogResult.OK)
-        {
-            _fillColor = fillColorDialog.Color;
-        }
+        if (fillColorDialog.ShowDialog() == DialogResult.OK) _fillColor = fillColorDialog.Color;
     }
 
     private void addFigureButton_Click(object sender, EventArgs e)
@@ -1129,7 +1085,7 @@ public partial class Form1 : Form
 
         // Get a unique name for the figure
         var name = _canvas.GenerateUniqueFigureName(figureType);
-        
+
         CreateAndAddFigure(figureType, size, position, name, pivotOffset);
 
         // Update the button states and render the canvas
@@ -1159,17 +1115,13 @@ public partial class Form1 : Form
         if (customPivotCheckBox.Checked &&
             double.TryParse(pivotOffsetXTextBox.Text, out var pivotXOffset) &&
             double.TryParse(pivotOffsetYTextBox.Text, out var pivotYOffset))
-        {
             pivotOffset = new PointF((float)pivotXOffset, (float)pivotYOffset);
-        }
         else
-        {
             pivotOffset = PointF.Empty; // Default pivot offset
-        }
 
         return true;
     }
-    
+
     private void CreateAndAddFigure(string figureType, double size, PointF position, string name, PointF pivotOffset)
     {
         // Create the figure
@@ -1188,12 +1140,9 @@ public partial class Form1 : Form
         // Execute the operation and push it to the undo stack
         addOperation.Execute(_canvas);
         _canvas.UndoStack.Push(addOperation);
-        
+
         // Deselect all figures but the new one
-        foreach (var figure in _canvas.Figures)
-        {
-            figure.IsSelected = false;
-        }
+        foreach (var figure in _canvas.Figures) figure.IsSelected = false;
         newFigure.IsSelected = true;
     }
 
@@ -1218,7 +1167,7 @@ public partial class Form1 : Form
         // Resubscribe the ItemCheck event
         figuresCheckedListBox.ItemCheck += FiguresCheckedListBox_ItemCheck;
     }
-    
+
     private void UpdateSelectAllCheckBox(Action action)
     {
         // Temporarily unsubscribe the CheckedChanged event
@@ -1240,23 +1189,18 @@ public partial class Form1 : Form
         {
             // Update the check state of all items in the figuresCheckedListBox
             for (var i = 0; i < figuresCheckedListBox.Items.Count; i++)
-            {
                 figuresCheckedListBox.SetItemCheckState(i, newCheckState);
-            }
         });
 
         // Select or deselect all figures based on the new check state
-        foreach (var figure in _canvas.Figures)
-        {
-            figure.IsSelected = newCheckState == CheckState.Checked;
-        }
+        foreach (var figure in _canvas.Figures) figure.IsSelected = newCheckState == CheckState.Checked;
 
         // Render the figures
         RenderFigures();
-        
+
         // Update the button states
         UpdateButtonStates();
-        
+
         // Update the button visibility
         UpdateButtonVisibilityBasedOnSelection();
     }
@@ -1279,20 +1223,14 @@ public partial class Form1 : Form
         UpdateButtonVisibilityBasedOnSelection();
 
         // Check if all items are deleted and uncheck the selectAllCheckBox
-        if (_canvas.Figures.Count == 0)
-        {
-            selectAllCheckBox.Checked = false;
-        }
+        if (_canvas.Figures.Count == 0) selectAllCheckBox.Checked = false;
     }
-    
+
     private void UndoButton_Click(object sender, EventArgs e)
     {
         _canvas.Undo();
         UpdateAllButtonStates();
-        foreach (var figure in _canvas.Figures)
-        {
-            SetFigureSelection(figure, false);
-        }
+        foreach (var figure in _canvas.Figures) SetFigureSelection(figure, false);
         RenderFigures();
 
         _timeLine?.Draw();
@@ -1304,19 +1242,16 @@ public partial class Form1 : Form
     private void RedoButton_Click(object sender, EventArgs e)
     {
         _canvas.Redo();
-        foreach (var figure in _canvas.Figures)
-        {
-            SetFigureSelection(figure, false);
-        }
+        foreach (var figure in _canvas.Figures) SetFigureSelection(figure, false);
         RenderFigures();
-        
+
         _timeLine?.Draw();
-        
-        
+
+
         selectAllCheckBox.Checked = false;
         UpdateAllButtonStates();
     }
-    
+
     private void UndoCustomFigureButton_Click(object sender, EventArgs e)
     {
         _canvas.Undo(true);
@@ -1329,24 +1264,24 @@ public partial class Form1 : Form
         _canvas.Redo(true);
         RedrawCustomFigure();
     }
-    
+
     private void resetButton_Click(object sender, EventArgs e)
     {
         _canvas.Reset();
-        
+
         _timeLine?.Reset();
-        
+
         figuresCheckedListBox.Items.Clear();
-        
+
         // Restore the default border and fill colors
         RestoreDefaultColors();
-        
+
         // Render the figures
         RenderFigures();
         UpdateButtonStates();
         UpdateButtonVisibilityBasedOnSelection();
     }
-    
+
     private void fillColorSelectedButton_Click(object sender, EventArgs e)
     {
         if (fillColorDialog.ShowDialog() != DialogResult.OK) return;
@@ -1355,7 +1290,7 @@ public partial class Form1 : Form
         RenderFigures();
         UpdateButtonStates();
     }
-    
+
     private void FillSelectedFigures()
     {
         // Create a change fill color operation for each selected figure
@@ -1368,7 +1303,7 @@ public partial class Form1 : Form
         batchOperation.Execute(_canvas);
         _canvas.UndoStack.Push(batchOperation);
     }
-    
+
     private void borderColorSelectedButton_Click(object sender, EventArgs e)
     {
         if (borderColorDialog.ShowDialog() != DialogResult.OK) return;
@@ -1377,7 +1312,7 @@ public partial class Form1 : Form
         RenderFigures();
         UpdateButtonStates();
     }
-    
+
     private void BorderSelectedFigures()
     {
         // Create a change border color operation for each selected figure
@@ -1390,7 +1325,7 @@ public partial class Form1 : Form
         batchOperation.Execute(_canvas);
         _canvas.UndoStack.Push(batchOperation);
     }
-    
+
     private void DuplicateButton_Click(object sender, EventArgs e)
     {
         // Create a duplicate operation for each selected figure
@@ -1402,21 +1337,18 @@ public partial class Form1 : Form
                 return new DuplicateFigureOperation(figure, duplicatedFigureName) { IsNewOperation = true };
             })
             .Cast<CanvasOperation>().ToList();
-        
+
         // Execute the batch operation and push it to the undo stack
         var batchOperation = new BatchCanvasOperation(operations);
         batchOperation.Execute(_canvas);
         _canvas.UndoStack.Push(batchOperation);
-        
+
         UpdateCheckedListBox(() =>
         {
             // For all figures, update the item checked state
-            foreach (var figure in _canvas.Figures)
-            {
-                FindCorrectItem(figure.Name, figure.IsSelected);
-            }
+            foreach (var figure in _canvas.Figures) FindCorrectItem(figure.Name, figure.IsSelected);
         });
-        
+
         UpdateSelectAllCheckBox(() =>
         {
             // Update the selectAllCheckBox
@@ -1427,7 +1359,7 @@ public partial class Form1 : Form
         UpdateButtonStates();
         UpdateButtonVisibilityBasedOnSelection();
     }
-    
+
     private void UpdateButtonVisibilityBasedOnSelection()
     {
         var isAnyFigureSelected = _canvas.Figures.Any(f => f.IsSelected);
@@ -1443,21 +1375,27 @@ public partial class Form1 : Form
         UpdateButtonVisibilityBasedOnSelection();
         UpdateTimeLineButtonStates();
     }
-    
+
     private void UpdateCustomFigureButtonStates()
     {
         UpdateButtonState(redoCustomFigureButton, _canvas.CanCustomFigureRedo(), Color.Green, DefaultBackColor);
         UpdateButtonState(undoCustomFigureButton, _canvas.CanCustomFigureUndo(), Color.Green, DefaultBackColor);
-        UpdateButtonState(addCustomFigureButton, _canvas.CustomFigurePoints.Count >= 3, Color.MidnightBlue, DefaultBackColor);
-        UpdateButtonState(resetCustomFigureButton, _canvas.CustomFigurePoints.Count > 0, Color.DarkGreen, DefaultBackColor);
-        UpdateButtonState(borderColorCustomFigureButton, _canvas.CustomFigurePoints.Count > 1, Color.SteelBlue, DefaultBackColor);
-        UpdateButtonState(fillColorCustomFigureButton, _canvas.CustomFigurePoints.Count > 2, Color.SteelBlue, DefaultBackColor);
+        UpdateButtonState(addCustomFigureButton, _canvas.CustomFigurePoints.Count >= 3, Color.MidnightBlue,
+            DefaultBackColor);
+        UpdateButtonState(resetCustomFigureButton, _canvas.CustomFigurePoints.Count > 0, Color.DarkGreen,
+            DefaultBackColor);
+        UpdateButtonState(borderColorCustomFigureButton, _canvas.CustomFigurePoints.Count > 1, Color.SteelBlue,
+            DefaultBackColor);
+        UpdateButtonState(fillColorCustomFigureButton, _canvas.CustomFigurePoints.Count > 2, Color.SteelBlue,
+            DefaultBackColor);
     }
 
     public void UpdateTimeLineButtonStates()
     {
-        UpdateButtonState(resetTimeLineButton, _timeLine != null && _timeLine.CanReset(), Color.DarkGreen, DefaultBackColor);
-        UpdateButtonState(playTimeLineButton, _timeLine != null && _timeLine.CanPlay(), Color.MidnightBlue, DefaultBackColor);
+        UpdateButtonState(resetTimeLineButton, _timeLine != null && _timeLine.CanReset(), Color.DarkGreen,
+            DefaultBackColor);
+        UpdateButtonState(playTimeLineButton, _timeLine != null && _timeLine.CanPlay(), Color.MidnightBlue,
+            DefaultBackColor);
     }
 
     public void UpdateButtonStates()
@@ -1465,15 +1403,17 @@ public partial class Form1 : Form
         UpdateButtonState(undoButton, _canvas.CanUndo(), Color.Green, DefaultBackColor);
         UpdateButtonState(redoButton, _canvas.CanRedo(), Color.Green, DefaultBackColor);
         UpdateButtonState(deleteButton, figuresCheckedListBox.CheckedItems.Count > 0, Color.Red, DefaultBackColor);
-        UpdateButtonState(resetButton, _canvas.Figures.Count > 0 || _canvas.UndoStack.Count > 0 || _canvas.RedoStack.Count > 0, Color.DarkGreen, DefaultBackColor);
+        UpdateButtonState(resetButton,
+            _canvas.Figures.Count > 0 || _canvas.UndoStack.Count > 0 || _canvas.RedoStack.Count > 0, Color.DarkGreen,
+            DefaultBackColor);
     }
-    
+
     private static void UpdateButtonState(Control button, bool condition, Color enabledColor, Color disabledColor)
     {
         button.Enabled = condition;
         button.BackColor = condition ? enabledColor : disabledColor;
     }
-    
+
     public void DisableButtons()
     {
         DisableButton(undoButton);
@@ -1495,13 +1435,13 @@ public partial class Form1 : Form
         button.Enabled = false;
         button.BackColor = DefaultBackColor;
     }
-    
+
     private void RestoreDefaultColors()
     {
         _borderColor = Color.White;
         _fillColor = Color.FromArgb(128, Color.White);
     }
-    
+
     private void customTimeLineDurationCheckBox_CheckedChanged(object sender, EventArgs e)
     {
         var isChecked = customTimeLineDurationCheckBox.Checked;
@@ -1513,14 +1453,13 @@ public partial class Form1 : Form
     {
         var duration = TimeLine.DefaultDuration;
         if (customTimeLineDurationCheckBox.Checked)
-        {
             if (!int.TryParse(customTimeLineDurationTextBox.Text, out duration) || duration < 3)
             {
-                MessageBox.Show(@"Invalid custom timeline duration. It should be an integer greater than or equal to 3.");
+                MessageBox.Show(
+                    @"Invalid custom timeline duration. It should be an integer greater than or equal to 3.");
                 return;
             }
-        }
-        
+
         // Set the control visibility
         timeLinePictureBox.Visible = true;
         playTimeLineButton.Visible = true;
@@ -1529,66 +1468,60 @@ public partial class Form1 : Form
         customTimeLineDurationLabel.Visible = false;
         customTimeLineDurationTextBox.Visible = false;
         addTimeLineButton.Visible = false;
-        
+
         // Create a new TimeLine instance
         _timeLine = new TimeLine(timeLinePictureBox, _timeLineGraphics, _canvas, this, duration);
-        
+
         _canvas.TimeLine = _timeLine;
-        
+
         // Draw the timeline
         _timeLine.Draw();
-        
+
         // Update the button states
         UpdateTimeLineButtonStates();
     }
-    
+
     private void playTimeLineButton_Click(object sender, EventArgs e)
     {
         addFigureCheckBox.Checked = false;
         _isAddFigureModeActive = false;
         _isAddCustomFigureModeActive = false;
-        
-        foreach (var figure in _canvas.Figures)
-        {
-            figure.IsSelected = false;
-        }
-        
+
+        foreach (var figure in _canvas.Figures) figure.IsSelected = false;
+
         // Uncheck all selected items in the figuresCheckedListBox
-        for (var i = 0; i < figuresCheckedListBox.Items.Count; i++)
-        {
-            figuresCheckedListBox.SetItemChecked(i, false);
-        }
-        
+        for (var i = 0; i < figuresCheckedListBox.Items.Count; i++) figuresCheckedListBox.SetItemChecked(i, false);
+
         UpdateButtonVisibilityBasedOnSelection();
-        
+
         playTimeLineButton.Visible = false;
-        
+
         _timeLine?.Play(_g, canvasPictureBox);
-        
+
         playTimeLineButton.Visible = true;
     }
-    
+
     private void resetTimeLineButton_Click(object sender, EventArgs e)
     {
         _timeLine?.Reset();
         UpdateTimeLineButtonStates();
     }
-    
+
     private void timeLinePictureBox_MouseMove(object sender, MouseEventArgs e)
     {
         _timeLine?.HandleMouseMove(e);
     }
-    
+
     private void timeLinePictureBox_Click(object sender, EventArgs e)
     {
         _timeLine?.HandleClick();
     }
-    
+
     private void timeLinePictureBox_MouseDown(object sender, MouseEventArgs e)
     {
         _timeLine?.HandleMouseDown();
     }
-    
+
     private void timeLinePictureBox_MouseUp(object sender, MouseEventArgs e)
     {
         _timeLine?.HandleMouseUp();
@@ -1601,105 +1534,70 @@ public partial class Form1 : Form
         {
             case Keys.Enter:
                 if (_isAddFigureModeActive)
-                {
                     addFigureButton_Click(this, EventArgs.Empty);
-                }
-                else if (_isAddCustomFigureModeActive)
-                {
-                    AddCustomFigureButton_Click(this, EventArgs.Empty);
-                }
+                else if (_isAddCustomFigureModeActive) AddCustomFigureButton_Click(this, EventArgs.Empty);
                 break;
             case Keys.Left:
-                if (timeLinePictureBox.Visible)
-                {
-                    _timeLine?.MoveCursorLeft();
-                }
+                if (timeLinePictureBox.Visible) _timeLine?.MoveCursorLeft();
                 break;
             case Keys.Right:
-                if (timeLinePictureBox.Visible)
-                {
-                    _timeLine?.MoveCursorRight();
-                }
+                if (timeLinePictureBox.Visible) _timeLine?.MoveCursorRight();
                 break;
             case Keys.Up:
                 break;
             case Keys.Down:
                 break;
             case Keys.Back:
-                if (deleteButton.Enabled)
-                {
-                    DeleteButton_Click(this, EventArgs.Empty);
-                }
+                if (deleteButton.Enabled) DeleteButton_Click(this, EventArgs.Empty);
                 break;
             case Keys.Control | Keys.Z:
-                if (undoButton.Enabled && !_isAddCustomFigureModeActive)
-                {
-                    UndoButton_Click(this, EventArgs.Empty);
-                }
+                if (undoButton.Enabled && !_isAddCustomFigureModeActive) UndoButton_Click(this, EventArgs.Empty);
                 if (undoCustomFigureButton.Enabled && _isAddCustomFigureModeActive)
-                {
                     UndoCustomFigureButton_Click(this, EventArgs.Empty);
-                }
                 break;
             case Keys.Control | Keys.Y:
-                if (redoButton.Enabled && !_isAddCustomFigureModeActive)
-                {
-                    RedoButton_Click(this, EventArgs.Empty);
-                }
+                if (redoButton.Enabled && !_isAddCustomFigureModeActive) RedoButton_Click(this, EventArgs.Empty);
                 if (redoCustomFigureButton.Enabled && _isAddCustomFigureModeActive)
-                {
                     RedoCustomFigureButton_Click(this, EventArgs.Empty);
-                }
                 break;
             case Keys.Control | Keys.Shift | Keys.Z:
-                if (redoButton.Enabled && !_isAddCustomFigureModeActive)
-                {
-                    RedoButton_Click(this, EventArgs.Empty);
-                }
+                if (redoButton.Enabled && !_isAddCustomFigureModeActive) RedoButton_Click(this, EventArgs.Empty);
                 if (redoCustomFigureButton.Enabled && _isAddCustomFigureModeActive)
-                {
                     RedoCustomFigureButton_Click(this, EventArgs.Empty);
-                }
                 break;
             case Keys.Control | Keys.A:
                 if (!_isAddCustomFigureModeActive)
                 {
                     selectAllCheckBox.Checked = true;
-                    
+
                     // Update the button visibility
                     UpdateButtonVisibilityBasedOnSelection();
-                    
+
                     // Update the button states
                     UpdateButtonStates();
                 }
+
                 break;
             case Keys.Control | Keys.Shift | Keys.A:
                 if (!_isAddCustomFigureModeActive)
                 {
                     selectAllCheckBox.Checked = false;
-                    
+
                     // Update the button visibility
                     UpdateButtonVisibilityBasedOnSelection();
-                    
+
                     // Update the button states
                     UpdateButtonStates();
                 }
+
                 break;
             case Keys.Control | Keys.R:
-                if (resetButton.Enabled && !_isAddCustomFigureModeActive)
-                {
-                    resetButton_Click(this, EventArgs.Empty);
-                }
+                if (resetButton.Enabled && !_isAddCustomFigureModeActive) resetButton_Click(this, EventArgs.Empty);
                 if (resetCustomFigureButton.Enabled && _isAddCustomFigureModeActive)
-                {
                     ResetCustomFigureButton_Click(this, EventArgs.Empty);
-                }
                 break;
             case Keys.Control | Keys.D:
-                if (duplicateButton.Enabled)
-                {
-                    DuplicateButton_Click(this, EventArgs.Empty);
-                }
+                if (duplicateButton.Enabled) DuplicateButton_Click(this, EventArgs.Empty);
                 break;
         }
 

@@ -14,16 +14,13 @@ public enum ResizePosition
 
 public abstract class CanvasOperation
 {
+    public bool IsNewOperation { get; set; }
     public abstract void Execute(Canvas canvas);
     public abstract void Undo(Canvas canvas);
-    public bool IsNewOperation { get; set; }
-    
+
     protected void ClearRedoStackIfNewOperation(Stack<CanvasOperation> redoStack)
     {
-        if (IsNewOperation)
-        {
-            redoStack.Clear();
-        }
+        if (IsNewOperation) redoStack.Clear();
     }
 }
 
@@ -33,10 +30,7 @@ internal class BatchCanvasOperation(List<CanvasOperation> operations) : CanvasOp
 
     public override void Execute(Canvas canvas)
     {
-        foreach (var operation in Operations)
-        {
-            operation.Execute(canvas);
-        }
+        foreach (var operation in Operations) operation.Execute(canvas);
     }
 
     public override void Undo(Canvas canvas)
@@ -57,17 +51,15 @@ internal class AddFigureOperation(Figure figure) : CanvasOperation
     public override void Execute(Canvas canvas)
     {
         canvas.Figures.Add(figure);
-        
-        if (figure is UnfinishedCustomFigure)
-        {
-            return;
-        }
-        
+
+        if (figure is UnfinishedCustomFigure) return;
+
         canvas.OnFigureAdded(figure);
 
         if (canvas.TimeLine != null)
         {
-            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures, this);
+            _handleKeyFrameOperation =
+                new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures, this);
             _handleKeyFrameOperation.Execute(canvas);
         }
 
@@ -95,13 +87,14 @@ internal class DeleteFigureOperation(Figure figure) : CanvasOperation
     {
         canvas.Figures.Remove(figure);
         canvas.OnFigureRemoved(figure);
-        
+
         if (canvas.TimeLine != null)
         {
-            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures, this);
+            _handleKeyFrameOperation =
+                new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures, this);
             _handleKeyFrameOperation.Execute(canvas);
         }
-        
+
         ClearRedoStackIfNewOperation(canvas.RedoStack);
     }
 
@@ -112,7 +105,7 @@ internal class DeleteFigureOperation(Figure figure) : CanvasOperation
             IsNewOperation = IsNewOperation
         };
         operation.Execute(canvas);
-        
+
         _handleKeyFrameOperation?.Undo(canvas);
     }
 }
@@ -129,13 +122,14 @@ internal class RotateFigureOperation(Figure figure, double angle) : TransformFig
     public override void Execute(Canvas canvas)
     {
         Figure.Rotate(angle);
-        
+
         if (canvas.TimeLine != null)
         {
-            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures, this);
+            _handleKeyFrameOperation =
+                new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures, this);
             _handleKeyFrameOperation.Execute(canvas);
         }
-        
+
         ClearRedoStackIfNewOperation(canvas.RedoStack);
     }
 
@@ -146,7 +140,7 @@ internal class RotateFigureOperation(Figure figure, double angle) : TransformFig
             IsNewOperation = IsNewOperation
         };
         operation.Execute(canvas);
-        
+
         _handleKeyFrameOperation?.Undo(canvas);
     }
 }
@@ -154,17 +148,18 @@ internal class RotateFigureOperation(Figure figure, double angle) : TransformFig
 internal class TranslateFigureOperation(Figure figure, double dx, double dy) : TransformFigureOperation(figure)
 {
     private HandleKeyFrameOperation? _handleKeyFrameOperation;
-    
+
     public override void Execute(Canvas canvas)
     {
         Figure.Translate(dx, dy);
-        
+
         if (canvas.TimeLine != null)
         {
-            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures, this);
+            _handleKeyFrameOperation =
+                new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures, this);
             _handleKeyFrameOperation.Execute(canvas);
         }
-        
+
         ClearRedoStackIfNewOperation(canvas.RedoStack);
     }
 
@@ -175,7 +170,7 @@ internal class TranslateFigureOperation(Figure figure, double dx, double dy) : T
             IsNewOperation = IsNewOperation
         };
         operation.Execute(canvas);
-        
+
         _handleKeyFrameOperation?.Undo(canvas);
     }
 }
@@ -185,49 +180,47 @@ internal class AddUnfinishedCustomFigurePointOperation(UnfinishedCustomFigure fi
     public override void Execute(Canvas canvas)
     {
         // Check if it's the first point
-        if (canvas.CustomFigurePoints.Count == 0)
-        {
-            figure.RemoveLastPoint();
-        }
-        
+        if (canvas.CustomFigurePoints.Count == 0) figure.RemoveLastPoint();
+
         figure.AddPoint(point);
-        
+
         canvas.CustomFigurePoints.Add(point);
-        
+
         ClearRedoStackIfNewOperation(canvas.CustomFigureRedoStack);
     }
 
     public override void Undo(Canvas canvas)
     {
         figure.RemoveLastPoint();
-        
+
         canvas.CustomFigurePoints.RemoveAt(canvas.CustomFigurePoints.Count - 1);
-        
+
         ClearRedoStackIfNewOperation(canvas.CustomFigureRedoStack);
     }
 }
 
 internal class ChangeFillColorOperation(Figure figure, Color newColor) : CanvasOperation
 {
-    private HandleKeyFrameOperation? _handleKeyFrameOperation;
     private readonly Color _oldColor = figure.FillColor;
+    private HandleKeyFrameOperation? _handleKeyFrameOperation;
 
     public override void Execute(Canvas canvas)
     {
         figure.FillColor = newColor;
-        
+
         if (figure is UnfinishedCustomFigure)
         {
             ClearRedoStackIfNewOperation(canvas.CustomFigureRedoStack);
             return;
         }
-        
+
         if (canvas.TimeLine != null)
         {
-            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures, this);
+            _handleKeyFrameOperation =
+                new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures, this);
             _handleKeyFrameOperation.Execute(canvas);
         }
-        
+
         ClearRedoStackIfNewOperation(canvas.RedoStack);
     }
 
@@ -238,32 +231,33 @@ internal class ChangeFillColorOperation(Figure figure, Color newColor) : CanvasO
             IsNewOperation = IsNewOperation
         };
         operation.Execute(canvas);
-        
+
         _handleKeyFrameOperation?.Undo(canvas);
     }
 }
 
 internal class ChangeBorderColorOperation(Figure figure, Color newColor) : CanvasOperation
 {
-    private HandleKeyFrameOperation? _handleKeyFrameOperation;
     private readonly Color _oldColor = figure.BorderColor;
+    private HandleKeyFrameOperation? _handleKeyFrameOperation;
 
     public override void Execute(Canvas canvas)
     {
         figure.BorderColor = newColor;
-        
+
         if (figure is UnfinishedCustomFigure)
         {
             ClearRedoStackIfNewOperation(canvas.CustomFigureRedoStack);
             return;
         }
-        
+
         if (canvas.TimeLine != null)
         {
-            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures, this);
+            _handleKeyFrameOperation =
+                new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures, this);
             _handleKeyFrameOperation.Execute(canvas);
         }
-        
+
         ClearRedoStackIfNewOperation(canvas.RedoStack);
     }
 
@@ -274,7 +268,7 @@ internal class ChangeBorderColorOperation(Figure figure, Color newColor) : Canva
             IsNewOperation = IsNewOperation
         };
         operation.Execute(canvas);
-        
+
         _handleKeyFrameOperation?.Undo(canvas);
     }
 }
@@ -286,19 +280,19 @@ internal class ResizeFigureOperation(
     PointF newMousePosition)
     : CanvasOperation
 {
-    private HandleKeyFrameOperation? _handleKeyFrameOperation;
+    private readonly bool _hasFlipped = figure.HasFlipped;
     private readonly RectangleF _oldBoundingBox = figure.GetBounds();
+    private readonly ResizePosition _previousResizePosition = figure.PreviousResizePosition;
+    private HandleKeyFrameOperation? _handleKeyFrameOperation;
     private bool _needsXFlip;
     private bool _needsYFlip;
-    private readonly bool _hasFlipped = figure.HasFlipped;
-    private readonly ResizePosition _previousResizePosition = figure.PreviousResizePosition;
     private bool _wasFlippedX;
     private bool _wasFlippedY;
-    
+
     public override void Execute(Canvas canvas)
     {
         var newBoundingBox = CalculateNewBoundingBox(originalBox);
-        
+
         // Check if the new mouse position has crossed the opposite side of the figure
         if (HasCrossedOppositeSide(originalBox))
         {
@@ -307,75 +301,55 @@ internal class ResizeFigureOperation(
 
             // Calculate the new bounding box based on the new resize position
             newBoundingBox = CalculateOppositeNewBoundingBox(originalBox);
-            
+
             // Don't execute the operation if the new bounding box is invalid
-            if (Math.Abs(newBoundingBox.Width) <= 0 || Math.Abs(newBoundingBox.Height) <= 0)
-            {
-                return;
-            }
+            if (Math.Abs(newBoundingBox.Width) <= 0 || Math.Abs(newBoundingBox.Height) <= 0) return;
         }
-        
+
         ScaleAndTranslateFigure(newBoundingBox);
 
         HandleFlip();
-        
+
         // If figure was already flipped, set the flags to false
         if (IsNewOperation)
         {
             if (figure.HasFlippedX)
             {
-                if (_wasFlippedX)
-                {
-                    figure.HasFlippedX = false;
-                }
+                if (_wasFlippedX) figure.HasFlippedX = false;
             }
             else
             {
-                if (_wasFlippedX)
-                {
-                    figure.HasFlippedX = true;
-                }
+                if (_wasFlippedX) figure.HasFlippedX = true;
             }
-        
+
             if (figure.HasFlippedY)
             {
-                if (_wasFlippedY)
-                {
-                    figure.HasFlippedY = false;
-                }
+                if (_wasFlippedY) figure.HasFlippedY = false;
             }
             else
             {
-                if (_wasFlippedY)
-                {
-                    figure.HasFlippedY = true;
-                }
+                if (_wasFlippedY) figure.HasFlippedY = true;
             }
-            
-            if (figure is { HasFlippedX: false, HasFlippedY: false })
-            {
-                figure.HasFlipped = false;
-            }
+
+            if (figure is { HasFlippedX: false, HasFlippedY: false }) figure.HasFlipped = false;
         }
 
         figure.PreviousResizePosition = currentResizePosition;
-        
+
         if (canvas.TimeLine != null)
         {
-            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures, this);
+            _handleKeyFrameOperation =
+                new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures, this);
             _handleKeyFrameOperation.Execute(canvas);
         }
-        
+
         ClearRedoStackIfNewOperation(canvas.RedoStack);
     }
 
     public override void Undo(Canvas canvas)
     {
         // If the figure was flipped, flip it back
-        if (_wasFlippedX || _wasFlippedY)
-        {
-            figure.Flip(_wasFlippedX, _wasFlippedY);
-        }
+        if (_wasFlippedX || _wasFlippedY) figure.Flip(_wasFlippedX, _wasFlippedY);
 
         // Scale and translate the figure back to its original state
         var sx = _oldBoundingBox.Width / figure.GetBounds().Width;
@@ -384,17 +358,17 @@ internal class ResizeFigureOperation(
         var dx = _oldBoundingBox.X - figure.GetBounds().X;
         var dy = _oldBoundingBox.Y - figure.GetBounds().Y;
         figure.Translate(dx, dy);
-        
+
         // Reset the flip flags
         figure.HasFlipped = false;
         _wasFlippedX = false;
         _wasFlippedY = false;
-        
+
         // Reset the previous resize position
         currentResizePosition = _previousResizePosition;
-        
+
         _handleKeyFrameOperation?.Undo(canvas);
-        
+
         ClearRedoStackIfNewOperation(canvas.RedoStack);
     }
 
@@ -402,31 +376,37 @@ internal class ResizeFigureOperation(
     {
         var newBox = currentResizePosition switch
         {
-            ResizePosition.TopMiddle => boundingBox with { Y = newMousePosition.Y, Height = boundingBox.Bottom - newMousePosition.Y },
+            ResizePosition.TopMiddle => boundingBox with
+            {
+                Y = newMousePosition.Y, Height = boundingBox.Bottom - newMousePosition.Y
+            },
             ResizePosition.BottomMiddle => boundingBox with { Height = newMousePosition.Y - boundingBox.Y },
             ResizePosition.RightMiddle => boundingBox with { Width = newMousePosition.X - boundingBox.X },
-            ResizePosition.LeftMiddle => boundingBox with { X = newMousePosition.X, Width = boundingBox.Right - newMousePosition.X },
-            ResizePosition.TopLeft => new RectangleF(newMousePosition.X, newMousePosition.Y, boundingBox.Right - newMousePosition.X, boundingBox.Bottom - newMousePosition.Y),
-            ResizePosition.TopRight => new RectangleF(boundingBox.X, newMousePosition.Y, newMousePosition.X - boundingBox.X, boundingBox.Bottom - newMousePosition.Y),
-            ResizePosition.BottomLeft => new RectangleF(newMousePosition.X, boundingBox.Y, boundingBox.Right - newMousePosition.X, newMousePosition.Y - boundingBox.Y),
-            ResizePosition.BottomRight => boundingBox with { Width = newMousePosition.X - boundingBox.X, Height = newMousePosition.Y - boundingBox.Y },
+            ResizePosition.LeftMiddle => boundingBox with
+            {
+                X = newMousePosition.X, Width = boundingBox.Right - newMousePosition.X
+            },
+            ResizePosition.TopLeft => new RectangleF(newMousePosition.X, newMousePosition.Y,
+                boundingBox.Right - newMousePosition.X, boundingBox.Bottom - newMousePosition.Y),
+            ResizePosition.TopRight => new RectangleF(boundingBox.X, newMousePosition.Y,
+                newMousePosition.X - boundingBox.X, boundingBox.Bottom - newMousePosition.Y),
+            ResizePosition.BottomLeft => new RectangleF(newMousePosition.X, boundingBox.Y,
+                boundingBox.Right - newMousePosition.X, newMousePosition.Y - boundingBox.Y),
+            ResizePosition.BottomRight => boundingBox with
+            {
+                Width = newMousePosition.X - boundingBox.X, Height = newMousePosition.Y - boundingBox.Y
+            },
             _ => throw new ArgumentOutOfRangeException(nameof(boundingBox))
         };
-        
-        // Ensure the width and height are not less than the minimum
-        const float minSize = 1f; 
-        if (newBox.Width < minSize)
-        {
-            newBox.Width = minSize;
-        }
-        if (newBox.Height < minSize)
-        {
-            newBox.Height = minSize;
-        }
 
-        return newBox; 
+        // Ensure the width and height are not less than the minimum
+        const float minSize = 1f;
+        if (newBox.Width < minSize) newBox.Width = minSize;
+        if (newBox.Height < minSize) newBox.Height = minSize;
+
+        return newBox;
     }
-    
+
     private bool HasCrossedOppositeSide(RectangleF boundingBox)
     {
         return currentResizePosition switch
@@ -442,7 +422,7 @@ internal class ResizeFigureOperation(
             _ => throw new ArgumentOutOfRangeException(nameof(boundingBox))
         };
     }
-    
+
     private static ResizePosition GetOppositeResizePosition(ResizePosition currentResizePosition)
     {
         return currentResizePosition switch
@@ -458,7 +438,7 @@ internal class ResizeFigureOperation(
             _ => throw new ArgumentOutOfRangeException(nameof(currentResizePosition))
         };
     }
-    
+
     private RectangleF CalculateOppositeNewBoundingBox(RectangleF boundingBox)
     {
         return currentResizePosition switch
@@ -474,25 +454,25 @@ internal class ResizeFigureOperation(
             _ => throw new ArgumentOutOfRangeException(nameof(boundingBox))
         };
     }
-    
+
     private RectangleF CalculateTopMiddleOppositeNewBoundingBox(RectangleF boundingBox)
     {
         _needsYFlip = true;
         return boundingBox with { Y = newMousePosition.Y, Height = boundingBox.Top - newMousePosition.Y };
     }
-    
+
     private RectangleF CalculateBottomMiddleOppositeNewBoundingBox(RectangleF boundingBox)
     {
         _needsYFlip = true;
         return boundingBox with { Y = newMousePosition.Y, Height = newMousePosition.Y - boundingBox.Bottom };
     }
-    
+
     private RectangleF CalculateRightMiddleOppositeNewBoundingBox(RectangleF boundingBox)
     {
         _needsXFlip = true;
         return boundingBox with { Width = newMousePosition.X - boundingBox.Right };
     }
-    
+
     private RectangleF CalculateLeftMiddleOppositeNewBoundingBox(RectangleF boundingBox)
     {
         _needsXFlip = true;
@@ -509,6 +489,7 @@ internal class ResizeFigureOperation(
             return new RectangleF(newMousePosition.X, newMousePosition.Y, boundingBox.Left - newMousePosition.X,
                 boundingBox.Top - newMousePosition.Y);
         }
+
         // If the new mouse position is on the left of the figure without going above the figure
         if (newMousePosition.X <= boundingBox.X && newMousePosition.Y > boundingBox.Y)
         {
@@ -517,12 +498,17 @@ internal class ResizeFigureOperation(
             return new RectangleF(newMousePosition.X, boundingBox.Top, boundingBox.Left - newMousePosition.X,
                 newMousePosition.Y - boundingBox.Top);
         }
+
         // If the new mouse position is above the figure without going to the left of the figure
         _needsYFlip = true;
         currentResizePosition = ResizePosition.TopRight;
-        return boundingBox with { Y = newMousePosition.Y, Width = newMousePosition.X - boundingBox.X, Height = boundingBox.Y - newMousePosition.Y };
+        return boundingBox with
+        {
+            Y = newMousePosition.Y, Width = newMousePosition.X - boundingBox.X,
+            Height = boundingBox.Y - newMousePosition.Y
+        };
     }
-    
+
     private RectangleF CalculateTopRightOppositeNewBoundingBox(RectangleF boundingBox)
     {
         // If the new mouse position is on the right of the figure and above the figure
@@ -533,6 +519,7 @@ internal class ResizeFigureOperation(
             return new RectangleF(boundingBox.Right, newMousePosition.Y, newMousePosition.X - boundingBox.Right,
                 boundingBox.Top - newMousePosition.Y);
         }
+
         // If the new mouse position is on the right of the figure without going above the figure
         if (newMousePosition.X >= boundingBox.Right && newMousePosition.Y > boundingBox.Y)
         {
@@ -541,13 +528,14 @@ internal class ResizeFigureOperation(
             return new RectangleF(boundingBox.Right, boundingBox.Top, newMousePosition.X - boundingBox.Right,
                 newMousePosition.Y - boundingBox.Top);
         }
+
         // If the new mouse position is above the figure without going to the right of the figure
         _needsYFlip = true;
         currentResizePosition = ResizePosition.TopLeft;
         return new RectangleF(newMousePosition.X, newMousePosition.Y, boundingBox.Right - newMousePosition.X,
             boundingBox.Y - newMousePosition.Y);
     }
-    
+
     private RectangleF CalculateBottomLeftOppositeNewBoundingBox(RectangleF boundingBox)
     {
         // If the new mouse position is on the left of the figure and below the figure
@@ -558,6 +546,7 @@ internal class ResizeFigureOperation(
             return new RectangleF(newMousePosition.X, boundingBox.Bottom, boundingBox.Left - newMousePosition.X,
                 newMousePosition.Y - boundingBox.Bottom);
         }
+
         // If the new mouse position is on the left of the figure without going below the figure
         if (newMousePosition.X <= boundingBox.X && newMousePosition.Y < boundingBox.Bottom)
         {
@@ -566,13 +555,14 @@ internal class ResizeFigureOperation(
             return new RectangleF(newMousePosition.X, newMousePosition.Y, boundingBox.Left - newMousePosition.X,
                 boundingBox.Bottom - newMousePosition.Y);
         }
+
         // If the new mouse position is below the figure without going to the left of the figure
         _needsYFlip = true;
         currentResizePosition = ResizePosition.BottomRight;
         return new RectangleF(newMousePosition.X, boundingBox.Bottom, boundingBox.Left - newMousePosition.X,
             newMousePosition.Y - boundingBox.Bottom);
     }
-    
+
     private RectangleF CalculateBottomRightOppositeNewBoundingBox(RectangleF boundingBox)
     {
         // If the new mouse position is on the right of the figure and below the figure
@@ -592,13 +582,14 @@ internal class ResizeFigureOperation(
             return new RectangleF(boundingBox.Right, newMousePosition.Y, newMousePosition.X - boundingBox.Right,
                 boundingBox.Bottom - newMousePosition.Y);
         }
+
         // If the new mouse position is below the figure without going to the right of the figure
         _needsYFlip = true;
         currentResizePosition = ResizePosition.BottomLeft;
         return new RectangleF(newMousePosition.X, boundingBox.Bottom, boundingBox.Right - newMousePosition.X,
             newMousePosition.Y - boundingBox.Bottom);
     }
-    
+
     private void ScaleAndTranslateFigure(RectangleF newBoundingBox)
     {
         var sx = newBoundingBox.Width / _oldBoundingBox.Width;
@@ -674,10 +665,7 @@ internal class ResizeFigureOperation(
 
                 var flipActions = CreateFlipActions();
 
-                if (flipActions.TryGetValue((_previousResizePosition, currentResizePosition), out var action))
-                {
-                    action();
-                }
+                if (flipActions.TryGetValue((_previousResizePosition, currentResizePosition), out var action)) action();
 
                 needsFlip = true;
             }
@@ -689,7 +677,7 @@ internal class ResizeFigureOperation(
         _wasFlippedY = _needsYFlip;
         figure.HasFlipped = true;
     }
-    
+
     private Dictionary<(ResizePosition, ResizePosition), Action> CreateFlipActions()
     {
         return new Dictionary<(ResizePosition, ResizePosition), Action>
@@ -700,16 +688,40 @@ internal class ResizeFigureOperation(
             { (ResizePosition.BottomMiddle, ResizePosition.TopMiddle), () => _needsYFlip = true },
             { (ResizePosition.BottomLeft, ResizePosition.TopLeft), () => _needsYFlip = true },
             { (ResizePosition.BottomLeft, ResizePosition.BottomRight), () => _needsXFlip = true },
-            { (ResizePosition.BottomLeft, ResizePosition.TopRight), () => { _needsXFlip = true; _needsYFlip = true; } },
+            {
+                (ResizePosition.BottomLeft, ResizePosition.TopRight), () =>
+                {
+                    _needsXFlip = true;
+                    _needsYFlip = true;
+                }
+            },
             { (ResizePosition.BottomRight, ResizePosition.TopRight), () => _needsYFlip = true },
             { (ResizePosition.BottomRight, ResizePosition.BottomLeft), () => _needsXFlip = true },
-            { (ResizePosition.BottomRight, ResizePosition.TopLeft), () => { _needsXFlip = true; _needsYFlip = true; } },
+            {
+                (ResizePosition.BottomRight, ResizePosition.TopLeft), () =>
+                {
+                    _needsXFlip = true;
+                    _needsYFlip = true;
+                }
+            },
             { (ResizePosition.TopLeft, ResizePosition.BottomLeft), () => _needsYFlip = true },
             { (ResizePosition.TopLeft, ResizePosition.TopRight), () => _needsXFlip = true },
-            { (ResizePosition.TopLeft, ResizePosition.BottomRight), () => { _needsXFlip = true; _needsYFlip = true; } },
+            {
+                (ResizePosition.TopLeft, ResizePosition.BottomRight), () =>
+                {
+                    _needsXFlip = true;
+                    _needsYFlip = true;
+                }
+            },
             { (ResizePosition.TopRight, ResizePosition.BottomRight), () => _needsYFlip = true },
             { (ResizePosition.TopRight, ResizePosition.TopLeft), () => _needsXFlip = true },
-            { (ResizePosition.TopRight, ResizePosition.BottomLeft), () => { _needsXFlip = true; _needsYFlip = true; } }
+            {
+                (ResizePosition.TopRight, ResizePosition.BottomLeft), () =>
+                {
+                    _needsXFlip = true;
+                    _needsYFlip = true;
+                }
+            }
         };
     }
 }
@@ -721,7 +733,7 @@ internal class MovePivotOperation(Figure figure, PointF newPivot) : CanvasOperat
     public override void Execute(Canvas canvas)
     {
         figure.Pivot = newPivot;
-        
+
         ClearRedoStackIfNewOperation(canvas.RedoStack);
     }
 
@@ -737,8 +749,8 @@ internal class MovePivotOperation(Figure figure, PointF newPivot) : CanvasOperat
 
 internal class DuplicateFigureOperation(Figure figure, string duplicateFigureName) : CanvasOperation
 {
-    private HandleKeyFrameOperation? _handleKeyFrameOperation;
     private Figure? _duplicate;
+    private HandleKeyFrameOperation? _handleKeyFrameOperation;
 
     public override void Execute(Canvas canvas)
     {
@@ -753,13 +765,14 @@ internal class DuplicateFigureOperation(Figure figure, string duplicateFigureNam
 
         canvas.Figures.Add(_duplicate);
         canvas.OnFigureAdded(_duplicate);
-        
+
         if (canvas.TimeLine != null)
         {
-            _handleKeyFrameOperation = new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures, this);
+            _handleKeyFrameOperation =
+                new HandleKeyFrameOperation(canvas.TimeLine, canvas.TimeLine.CurrentFrame, canvas.Figures, this);
             _handleKeyFrameOperation.Execute(canvas);
         }
-        
+
         ClearRedoStackIfNewOperation(canvas.RedoStack);
     }
 
@@ -770,7 +783,7 @@ internal class DuplicateFigureOperation(Figure figure, string duplicateFigureNam
             IsNewOperation = IsNewOperation
         };
         operation.Execute(canvas);
-        
+
         _handleKeyFrameOperation?.Undo(canvas);
     }
 }
@@ -780,7 +793,7 @@ internal class AddKeyFrameOperation(KeyFrame? keyFrame, TimeLine timeLine) : Can
     public override void Execute(Canvas canvas)
     {
         timeLine.KeyFrames.Add(keyFrame);
-        
+
         ClearRedoStackIfNewOperation(canvas.RedoStack);
     }
 
@@ -799,7 +812,7 @@ internal class DeleteKeyFrameOperation(KeyFrame? keyFrame, TimeLine timeLine) : 
     public override void Execute(Canvas canvas)
     {
         timeLine.KeyFrames.Remove(keyFrame);
-        
+
         ClearRedoStackIfNewOperation(canvas.RedoStack);
     }
 
@@ -813,14 +826,15 @@ internal class DeleteKeyFrameOperation(KeyFrame? keyFrame, TimeLine timeLine) : 
     }
 }
 
-internal class ChangeKeyFrameOperation(KeyFrame keyFrame, TimeLine timeLine, int oldFrame, int newFrame) : CanvasOperation
+internal class ChangeKeyFrameOperation(KeyFrame keyFrame, TimeLine timeLine, int oldFrame, int newFrame)
+    : CanvasOperation
 {
     public override void Execute(Canvas canvas)
     {
         keyFrame.Frame = newFrame;
-        
+
         timeLine.Draw();
-        
+
         ClearRedoStackIfNewOperation(canvas.RedoStack);
     }
 
@@ -834,7 +848,11 @@ internal class ChangeKeyFrameOperation(KeyFrame keyFrame, TimeLine timeLine, int
     }
 }
 
-internal class HandleKeyFrameOperation(TimeLine timeLine, int currentFrame, IEnumerable<Figure> figures, CanvasOperation operation) : CanvasOperation
+internal class HandleKeyFrameOperation(
+    TimeLine timeLine,
+    int currentFrame,
+    IEnumerable<Figure> figures,
+    CanvasOperation operation) : CanvasOperation
 {
     private KeyFrame? _keyFrame;
 
@@ -843,22 +861,19 @@ internal class HandleKeyFrameOperation(TimeLine timeLine, int currentFrame, IEnu
         var keyFrames = timeLine.KeyFrames;
 
         if (keyFrames.Count <= 0) return;
-        
+
         // If the operation is a delete figure operation, remove the figure from all keyframes
         if (operation is DeleteFigureOperation deleteFigureOperation)
         {
-            foreach (var kf in keyFrames)
-            {
-                kf?.Figures?.RemoveAll(f => f.Name == deleteFigureOperation.Figure.Name);
-            }
-            
+            foreach (var kf in keyFrames) kf?.Figures?.RemoveAll(f => f.Name == deleteFigureOperation.Figure.Name);
+
             // Remove any keyframes that have no figures
             keyFrames.RemoveAll(kf => kf?.Figures?.Count == 0);
-            
+
             timeLine.Draw();
             return;
         }
-        
+
         var keyFrame = keyFrames.FirstOrDefault(kf => kf != null && kf.Frame == currentFrame);
 
         if (keyFrame != null)
@@ -875,7 +890,7 @@ internal class HandleKeyFrameOperation(TimeLine timeLine, int currentFrame, IEnu
             _keyFrame.Figures.ForEach(f => f.IsSelected = false);
             keyFrames.Add(_keyFrame);
         }
-        
+
         timeLine.Draw();
     }
 
@@ -883,11 +898,8 @@ internal class HandleKeyFrameOperation(TimeLine timeLine, int currentFrame, IEnu
     {
         var keyFrames = timeLine.KeyFrames;
 
-        if (_keyFrame != null)
-        {
-            keyFrames.Remove(_keyFrame);
-        }
-        
+        if (_keyFrame != null) keyFrames.Remove(_keyFrame);
+
         timeLine.Draw();
     }
 }
