@@ -192,35 +192,6 @@ public class TimeLine(
 
                     var endFigure = endFiguresDict[startFigureName].Clone();  // Create a copy of the endFigure
                     
-                    // // Interpolate the flips of the figure
-                    // if (startFigure.HasFlippedX != endFigure.HasFlippedX)
-                    // {
-                    //     var effectiveT = t < 0.5 ? t * 2 : 2 * (1 - t);
-                    //
-                    //     // Figure out if X flip needs to 'collapse' or 'expand' 
-                    //     var needsXCollapse = t < 0.5; 
-                    //
-                    //     // Perform scaled flip
-                    //     var scaledFlipFigure = startFigure.Clone();
-                    //     scaledFlipFigure.DoScaledFlip(true, false, effectiveT, needsXCollapse); 
-                    //     
-                    //     startFigure = scaledFlipFigure;
-                    // } 
-                    //
-                    // if (startFigure.HasFlippedY != endFigure.HasFlippedY) 
-                    // {
-                    //     var effectiveT = t < 0.5 ? t * 2 : 2 * (1 - t);
-                    //
-                    //     // Figure out if Y flip needs to 'collapse' or 'expand' 
-                    //     var needsYCollapse = t < 0.5; 
-                    //
-                    //     // Perform scaled flip
-                    //     var scaledFlipFigure = startFigure.Clone();
-                    //     scaledFlipFigure.DoScaledFlip(false, true, effectiveT, needsYCollapse);
-                    //     
-                    //     startFigure = scaledFlipFigure;
-                    // }
-                    
                     // Interpolate the size (scaling) of the figure
                     var startBounds = startFigure.GetBounds();
                     RectangleF endBounds;
@@ -340,7 +311,7 @@ public class TimeLine(
         // Move the cursor to the start
         MoveCursorToStart();
         
-        // Draw the time line
+        // Draw the timeline
         Draw();
     }
 
@@ -621,7 +592,7 @@ public class TimeLine(
     
     private void DrawAddKeyFrameIcon(int padding)
     {
-        // Draw the icon at the bottom right corner of the PictureBox
+        // Draw the icon in the bottom right corner of the PictureBox
         var iconX = pictureBox.Width - 12 - padding;
         var iconY = pictureBox.Height - 12 - padding;
 

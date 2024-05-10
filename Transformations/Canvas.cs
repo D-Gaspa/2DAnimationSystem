@@ -2,9 +2,6 @@
 
 public sealed class Canvas
 {
-    // TODO: If enough time, add selection box when dragging the mouse and when the mouse is released, select all figures inside the box.
-    // TODO: Rotation needs to be added.
-    
     public readonly List<Figure> Figures = [];
     public readonly List<PointF> CustomFigurePoints = [];
     public readonly Stack<CanvasOperation> UndoStack = new();
